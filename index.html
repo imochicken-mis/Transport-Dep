@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Watch — Vehicle Monitoring System</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<script>
+  // Auth guard: no session -> back to login
+  if (!sessionStorage.getItem("vms_user")) {
+    window.location.href = "login.html";
+  }
+</script>
+
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <img src="images/logo.png" alt="Company logo" class="company-logo2">
+    <div class="brand">
+      <span class="brand-name">Imo Chicken & Agro (Pvt) Ltd</span>
+      <span class="brand-subtitle">Vehicle Monitoring System</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="dashboard"><span class="ico">📊</span>Dashboard</button>
+
+      <div class="nav-section-label">Data Entry</div>
+      <button class="nav-item" data-view="vehicles"><span class="ico">🚗</span>Vehicle Master</button>
+      <button class="nav-item" data-view="drivers"><span class="ico">👨‍✈️</span>Driver Master</button>
+      <button class="nav-item" data-view="fuel"><span class="ico">⛽</span>Fuel Management</button>
+      <button class="nav-item" data-view="Lubricant"><span class="ico">🛢️</span>Lubricant Management</button>
+      <button class="nav-item" data-view="maintenance"><span class="ico">🔧</span>Service & Maintenance</button>
+      <button class="nav-item" data-view="licenseInsurance"><span class="ico">🛡️</span>License & Insurance</button>
+      <button class="nav-item" data-view="Accident"><span class="ico">⚠️</span>Accident Recorder</button>
+
+      <div class="nav-section-label">Reports</div>
+      <button class="nav-item" data-view="reports"><span class="ico">▦</span>Report Viewer</button>
+    </nav>
+    <div class="sidebar-foot">
+      <span class="dot dot-live"></span> Apps Script API
+      <div class="foot-status" id="apiStatus">checking…</div>
+      <div class="foot-user" id="footUser"></div>
+      <button class="logout-btn" id="logoutBtn">Log out</button>
+    </div>
+  </aside>
+
+  <!-- Topbar (mobile) -->
+  <header class="topbar">
+    <button class="hamburger" id="hamburgerBtn">☰</button>
+    <span class="topbar-title" id="viewTitle">Dashboard</span>
+  </header>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="view-head">
+        <h1>Fleet overview</h1>
+        <p class="sub">Real-time snapshot of every vehicle, driver and cost sheet.</p>
+      </div>
+
+      <div class="gauge-row" id="gaugeRow"><!-- gauges injected by JS --></div>
+
+      <div class="lookup-triple-row" style="grid-template-columns:1.6fr 1fr; margin-bottom:18px;">
+        <div class="panel">
+          <div class="chart-toolbar">
+            <h2 style="font-size:16px;">All Vehicles — Monthly Total Cost</h2>
+            <select id="fleetCostChartYear"></select>
+          </div>
+          <div class="panel-body" id="fleetCostChartContainer"></div>
+        </div>
+
+        <div class="panel">
+          <div class="chart-toolbar">
+            <h2 style="font-size:14px;">Top 10 Highest Cost Vehicles</h2>
+            <select id="topVehiclesMonth"></select>
+          </div>
+          <div class="panel-body table-scroll" id="topVehiclesList">Select a year first.</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:18px;">
+        <div class="chart-toolbar">
+          <h2 style="font-size:16px;">All Vehicles — Monthly Total Fuel Comparison</h2>
+          <div style="display:flex; gap:8px;">
+            <select id="fleetFuelYear"></select>
+            <select id="fleetFuelType">
+              <option value="All">All (Diesel + Petrol)</option>
+              <option value="Diesel">Diesel</option>
+              <option value="Petrol">Petrol</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-body" id="fleetFuelComboChart">Loading…</div>
+      </div>
+
+      <div class="lookup-triple-row" style="grid-template-columns:1fr 1fr; margin-top:18px;">
+        <div class="panel">
+          <div class="panel-head"><h2>License Expiring (within 7 days)</h2></div>
+          <div class="panel-body table-scroll" id="licenseExpiringList">Loading…</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Insurance Expiring (within 7 days)</h2></div>
+          <div class="panel-body table-scroll" id="insuranceExpiringList">Loading…</div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <div class="view-head" style="margin-top:30px;">
+        <h1>Vehicle Overview</h1>
+        <p class="sub">Select a vehicle to see every record linked to it in one place.</p>
+      </div>
+      <div class="toolbar" style="align-items:center;">
+        <div class="combobox-wrap">
+          <input type="text" id="vehicleLookupInput" placeholder="Type or click to select a vehicle no…" autocomplete="off">
+          <div class="combobox-dropdown" id="vehicleLookupDropdown"></div>
+        </div>
+        <img id="vehicleLookupImage" class="vehicle-lookup-image" style="display:none;">
+      </div>
+      <div id="vehicleLookupResults"><p class="hint">Select a vehicle above to see its full history.</p></div>
+    </section>
+
+    <!-- GENERIC CRUD VIEWS -->
+    <section class="view" id="view-vehicles"></section>
+    <section class="view" id="view-drivers"></section>
+    <section class="view" id="view-fuel"></section>
+    <section class="view" id="view-maintenance">
+  <div class="view-head maintenance-head">
+    <h1>Service & Maintenance Management</h1>
+    <div class="subtabs" id="maintenanceSubtabs">
+      <button class="subtab-btn active" data-submodule="serviceRecords">Service</button>
+      <button class="subtab-btn" data-submodule="repairParts">Repair</button>
+    </div>
+  </div>
+  <div id="maintenanceContent"></div>
+</section>
+    <section class="view" id="view-licenseInsurance">
+  <div class="view-head maintenance-head">
+    <h1>License & Insurance Management</h1>
+    <div class="subtabs" id="licenseInsuranceSubtabs">
+      <button class="subtab-btn active" data-submodule="License">License</button>
+      <button class="subtab-btn" data-submodule="Insurance">Insurance</button>
+    </div>
+  </div>
+  <div id="licenseInsuranceContent"></div>
+</section>
+    <section class="view" id="view-Lubricant"></section>
+    <section class="view" id="view-Accident"></section>
+
+    <!-- TRACKING -->
+    <section class="view" id="view-tracking">
+      <div class="view-head">
+        <h1>Live tracking</h1>
+        <p class="sub">Last reported position for each vehicle. Drivers push location from their phone below.</p>
+      </div>
+      <div class="tracking-grid">
+        <div id="map"></div>
+        <div class="tracking-side">
+          <div class="panel">
+            <div class="panel-head"><h2>Push my location</h2></div>
+            <div class="panel-body">
+              <label class="field">
+                <span>Vehicle</span>
+                <select id="trackVehicleSelect"></select>
+              </label>
+              <button class="btn btn-primary" id="pushLocationBtn">Send current GPS position</button>
+              <p class="hint" id="pushStatus"></p>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Vehicles online</h2></div>
+            <div class="panel-body" id="trackList">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="view" id="view-reports">
+      <div class="view-head no-print">
+        <h1>Report viewer</h1>
+        <p class="sub">Pick a report, review it on screen, then print or save as PDF.</p>
+      </div>
+      <div class="toolbar no-print">
+        <select id="reportType">
+          <option value="fleet">Fleet Summary — all vehicles</option>
+          <option value="fuel">Fuel Cost Report</option>
+          <option value="maintenance">Maintenance Schedule</option>
+        </select>
+        <div id="fuelReportFilters" style="display:none; gap:10px; align-items:center;">
+          <label style="font-size:12.5px; color:var(--muted);">From
+            <input type="date" id="fuelReportFrom" style="margin-left:4px; padding:8px; border:1px solid var(--line); border-radius:8px;">
+          </label>
+          <label style="font-size:12.5px; color:var(--muted);">To
+            <input type="date" id="fuelReportTo" style="margin-left:4px; padding:8px; border:1px solid var(--line); border-radius:8px;">
+          </label>
+          <select id="fuelReportVehicle"></select>
+        </div>
+        <button class="btn btn-primary" id="printReportBtn">🖨 Print / Save as PDF</button>
+      </div>
+      <div class="panel">
+  <div class="panel-body table-scroll" id="reportArea">Choose a report above.</div>
+</div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Reusable modal for add/edit forms -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Add record</h3>
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+    </div>
+    <form id="modalForm" class="modal-body"></form>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
