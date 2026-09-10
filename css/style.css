@@ -38,10 +38,10 @@ button{font-family:Arial, Helvetica, sans-serif; cursor:pointer;}
 .sidebar{
   background: linear-gradient(to left, #00245E, #003d9e);
   color:#CBD4DE;
-  padding:20px 14px;
+  padding:8px 14px 20px;
   display:flex;
   flex-direction:column;
-  position:sticky; top:0; height:100vh;
+  position:sticky; top:0; height:100vh; isolation: isolate;
 }
 .brand{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px 22px;}
 .brand-name{font-family:arial; font-size:14px; color:#fff; letter-spacing:.3px; text-align: center;}
@@ -91,10 +91,10 @@ button{font-family:Arial, Helvetica, sans-serif; cursor:pointer;}
 .hamburger{background:none;border:none;color:#fff;font-size:20px;}
 .topbar-title{font-family:var(--display); font-size:17px;}
 
-.content{padding:28px 32px 60px; background-color: #e7e7e7;}
+.content{padding:28px 32px 60px; background-color: #ffffff;}
 .view{display:none;}
 .view.active{display:block;}
-.view-head{margin-bottom:22px; margin-top: -15px; min-width: 200px;}
+.view-head{margin-bottom:22px; margin-top: 0; min-width: 200px;}
 .view-head h1{font-size:28px; font-family: Arial, Helvetica, sans-serif;}
 .view-head .sub{color:var(--muted); margin:4px 0 0; font-size:14px;}
 
@@ -304,7 +304,7 @@ thead th{
   width: 100%;
   max-height: 48px;
   object-fit: contain;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   display: block;
 }
 
@@ -373,7 +373,7 @@ thead th{
 .report-header .company-name{font-size:13.5px; color:var(--muted); font-weight:600; margin-left: 10px;}
 .report-info-row{display:flex; justify-content:space-between; margin:16px 0; gap:16px;}
 .report-info-col{flex:2;}
-.report-info-col.left{text-align:left; width: 100px; margin-left: 10px;}
+.report-info-col.left{text-align:left; width: 300px; margin-left: 10px;}
 .report-info-col.center{text-align:left; padding-left:30%;}
 .report-info-col.right{text-align:left; padding-left:20%; margin-right: 40px; width: 500px;}
 .report-info-col div{padding:2px 0; font-size:12.5px;}
@@ -454,4 +454,458 @@ thead th{
 .expiry-urgent {
   color: #d20000;
   font-weight: 700;
+}
+
+/* ===== Vehicle Stats Cards ===== */
+.stats-card-container { 
+  margin-bottom: 18px; 
+}
+.stats-row { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); 
+  gap: 14px; 
+}
+/* ===== Stat Card — Decorated ===== */
+.stat-card {
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);
+  border-radius: 16px;
+  padding: 18px 20px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border: 1.5px solid #dbe4ff;
+  box-shadow: 
+    0 2px 6px rgba(0, 36, 94, 0.06),
+    0 8px 24px rgba(0, 36, 94, 0.04);
+  transition: all 0.25s cubic-bezier(.2,.7,.3,1);
+  cursor: default;
+  overflow: hidden;
+}
+
+/* උඩම තියෙන වර්ණවත් accent bar එක */
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #00245E 0%, #3B82F6 100%);
+  border-radius: 16px 16px 0 0;
+}
+
+/* දකුණු පැත්තේ ලස්සන icon watermark එකක් */
+.stat-card::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  border-color: #3B82F6;
+  box-shadow: 
+    0 4px 12px rgba(0, 36, 94, 0.10),
+    0 16px 40px rgba(0, 36, 94, 0.12);
+}
+
+.stat-card:hover::before {
+  background: linear-gradient(90deg, #3B82F6 0%, #F2A65A 100%);
+}
+.stat-icon { 
+  font-size: 32px; 
+  line-height: 1; 
+  width: 45px;
+  text-align: center;
+}
+.stat-content { 
+  flex: 1; 
+}
+.stat-title { 
+  font-size: 14px; 
+  font-weight: 600; 
+  color: var(--muted); 
+  letter-spacing: 0.5px; 
+  text-transform: uppercase; 
+}
+.stat-numbers { 
+  display: flex; 
+  align-items: baseline; 
+  gap: 6px; 
+  flex-wrap: wrap; 
+  margin-top: 3px; 
+}
+.stat-total { 
+  font-size: 26px; 
+  font-weight: 700; 
+  color: var(--navy); 
+  font-family: var(--mono); 
+  line-height: 1.2;
+}
+.stat-label { 
+  font-size: 13px; 
+  color: var(--muted); 
+  font-weight: 500;
+}
+.stat-models { 
+  font-size: 12px; 
+  color: #fff; 
+  background: var(--steel); 
+  padding: 2px 10px; 
+  border-radius: 20px; 
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+@media (max-width: 700px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .stat-card { padding: 12px; }
+  .stat-icon { font-size: 24px; width: 35px; }
+  .stat-total { font-size: 22px; }
+}
+
+/* ===== Status Badges (Active / In Service / Inactive) ===== */
+.stat-status-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.stat-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 55px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: black;
+  font-family: calibri;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.stat-status .dot-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: black;
+  opacity: 0.85;
+}
+.stat-status.active   { background: #00ff15; } /* Green */
+.stat-status.inservice{ background: #f9ef2e; } /* Yellow */
+.stat-status.inactive { background: #ff5d44; } /* Red */
+
+/* ========== Full-height table layout (no page scrollbar) ========== */
+
+/* Page එකේ scroll එක නවත්තන්න */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-shell {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Content area එක flex column එකක් කරන්න */
+.content {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 32px 20px;   /* top 28px -> 20px */
+  box-sizing: border-box;
+}
+
+/* CRUD table views පමණක් full height fill කරන්න */
+#view-vehicles.view.active,
+#view-drivers.view.active,
+#view-fuel.view.active,
+#view-Lubricant.view.active,
+#view-Accident.view.active,
+#view-maintenance.view.active,
+#view-licenseInsurance.view.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Panel එක ඉතුරු ඉඩ පුරවන්න */
+#view-vehicles.view.active > .panel,
+#view-drivers.view.active > .panel,
+#view-fuel.view.active > .panel,
+#view-Lubricant.view.active > .panel,
+#view-Accident.view.active > .panel,
+#view-maintenance.view.active > #maintenanceContent > .panel,
+#view-licenseInsurance.view.active > #licenseInsuranceContent > .panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Table body එක පමණක් scroll වෙන්න දෙන්න (පැරණි scrollbar එක) */
+#view-vehicles.view.active > .panel > .panel-body.table-scroll,
+#view-drivers.view.active > .panel > .panel-body.table-scroll,
+#view-fuel.view.active > .panel > .panel-body.table-scroll,
+#view-Lubricant.view.active > .panel > .panel-body.table-scroll,
+#view-Accident.view.active > .panel > .panel-body.table-scroll,
+#view-maintenance.view.active > #maintenanceContent > .panel > .panel-body.table-scroll,
+#view-licenseInsurance.view.active > #licenseInsuranceContent > .panel > .panel-body.table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;    /* ⬅️ පැරණි 675px limit එක අයින් කරනවා */
+  overflow-y: auto;
+}
+
+/* Maintenance & License/Insurance inner containers */
+#maintenanceContent,
+#licenseInsuranceContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ========== Dashboard / Tracking / Reports සාමාන්‍ය විදියටම තියෙන්න දෙන්න ========== */
+#view-dashboard.view.active,
+#view-tracking.view.active,
+#view-reports.view.active {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;   /* මේවා page එක ඇතුළතම scroll වෙයි */
+  display: block;
+}
+
+/* ===== Card accents — එක් එක් category එකට වර්ණ ===== */
+
+/* 🏍️ Bikes — Purple */
+.stat-card.accent-bikes::before {
+  background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+}
+.stat-card.accent-bikes:hover { border-color: #7c3aed; }
+.stat-card.accent-bikes::after {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.10) 0%, transparent 70%);
+}
+
+/* 🚗 Luxury Vehicles — Amber/Gold */
+.stat-card.accent-luxuryvehicles::before {
+  background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
+}
+.stat-card.accent-luxuryvehicles:hover { border-color: #d97706; }
+.stat-card.accent-luxuryvehicles::after {
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.10) 0%, transparent 70%);
+}
+
+/* 🚐 Vans & Bus — Blue */
+.stat-card.accent-vansbus::before {
+  background: linear-gradient(90deg, #00245E 0%, #3B82F6 100%);
+}
+.stat-card.accent-vansbus:hover { border-color: #3B82F6; }
+.stat-card.accent-vansbus::after {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.10) 0%, transparent 70%);
+}
+
+/* 🚛 Lorry — Red */
+.stat-card.accent-lorry::before {
+  background: linear-gradient(90deg, #b91c1c 0%, #ef4444 100%);
+}
+.stat-card.accent-lorry:hover { border-color: #b91c1c; }
+.stat-card.accent-lorry::after {
+  background: radial-gradient(circle, rgba(185, 28, 28, 0.10) 0%, transparent 70%);
+}
+
+/* 🚜 Land Vehicles — Green */
+.stat-card.accent-landvehicles::before {
+  background: linear-gradient(90deg, #15803d 0%, #22c55e 100%);
+}
+.stat-card.accent-landvehicles:hover { border-color: #15803d; }
+.stat-card.accent-landvehicles::after {
+  background: radial-gradient(circle, rgba(21, 128, 61, 0.10) 0%, transparent 70%);
+}
+
+/* ============================================
+   SIDEBAR TOGGLE BUTTON (DeepSeek style)
+   ============================================ */
+.sidebar-toggle {
+  align-self: flex-end;         /* දකුණු කෙළවරට */
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #CBD4DE;
+  cursor: pointer;
+  margin: 0 4px 6px 0;        /* දකුණු පැත්තෙන් ටිකක් ඉඩ */
+  padding: 0;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.20);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.08);
+}
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+/* Collapse වුනාම button එක මැදට */
+.sidebar.collapsed .sidebar-toggle {
+  align-self: center;
+  margin: 0 0 14px 0;
+}
+.sidebar.collapsed .sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* ============================================
+   MINI SIDEBAR STATE (icons only)
+   ============================================ */
+.app-shell {
+  transition: grid-template-columns 0.3s cubic-bezier(.2,.7,.3,1);
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 70px 1fr;
+}
+
+.sidebar.collapsed {
+  padding: 20px 8px;
+  overflow: visible;
+  transition: padding 0.3s ease;
+}
+
+/* Collapse වුනාම Logo, Brand, Section Labels, Footer hide කරන්න */
+.sidebar.collapsed .company-logo2,
+.sidebar.collapsed .brand,
+.sidebar.collapsed .nav-section-label,
+.sidebar.collapsed .sidebar-foot {
+  display: none;
+}
+
+/* Nav items — icons පමණක්, මැදට */
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
+  gap: 0;
+  font-size: 0;
+  border-radius: 12px;
+  position: relative;
+}
+.sidebar.collapsed .nav-item .ico {
+  font-size: 22px;
+  width: auto;
+  margin: 0;
+  opacity: 1;
+}
+
+/* Separator line එකක් nav එකට ඉහළින් */
+.sidebar.collapsed .nav::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 10px 8px;
+}
+
+/* ============================================
+   TOOLTIP (collapse වුනාම hover කළාම label පෙන්නන්න)
+   ============================================ */
+.sidebar.collapsed .nav-item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #00245E;
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 200;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  font-family: var(--body);
+}
+.sidebar.collapsed .nav-item::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #00245E;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 200;
+}
+.sidebar.collapsed .nav-item:hover::after,
+.sidebar.collapsed .nav-item:hover::before {
+  opacity: 1;
+}
+
+/* ============================================
+   LOGOUT BUTTON — collapse වුනාම icon only
+   ============================================ */
+.sidebar.collapsed .logout-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  margin: 12px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  border-radius: 10px;
+}
+.sidebar.collapsed .logout-btn::before {
+  content: "⎋";
+  font-size: 20px;
+  color: #CBD4DE;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+@media (max-width: 760px) {
+  .sidebar-toggle {
+    display: none !important;
+  }
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+  .sidebar.collapsed {
+    transform: none;
+    padding-left: 14px;
+    padding-right: 14px;
+    overflow: visible;
+  }
 }

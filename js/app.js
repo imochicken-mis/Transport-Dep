@@ -3,6 +3,96 @@
 // Each key maps to one Google Sheet tab. Add/remove fields here and
 // the table + add/edit form regenerate automatically.
 // ===================================================================
+
+// ===== Single Row HTML Generator (DOM එකට එක් පේළියක් එකතු කිරීමට) =====
+function renderSingleRow(key, row) {
+  const mod = MODULES[key];
+  const noEditTabs = (currentUser && currentUser.noEditTabs) || [];
+  const noDeleteTabs = (currentUser && currentUser.noDeleteTabs) || [];
+  const canEdit = !noEditTabs.includes(key.toLowerCase());
+  const canDelete = !noDeleteTabs.includes(key.toLowerCase());
+
+  return `<tr data-id="${row[mod.idField]}">
+    ${mod.fields.map((f) => `<td>${statusCell(f, row[f.key])}</td>`).join("")}
+    <td class="row-actions">
+      ${canEdit ? `<button title="Edit" onclick='openForm("${key}", ${JSON.stringify(row).replace(/'/g, "&apos;")})'>✎</button>` : ""}
+      ${canDelete ? `<button title="Delete" onclick='removeRow("${key}", "${row[mod.idField]}")'>🗑</button>` : ""}
+    </td>
+  </tr>`;
+}
+
+function getVehicleTypeIcon(categoryKey) {
+  const map = {
+    'Bikes': '🏍️',
+    'Luxury Vehicles': '🚗',
+    'Vans & Bus': '🚐',
+    'Lorry': '🚛',
+    'Land Vehicles': '🚜'
+  };
+  return map[categoryKey] || '🚗';
+}
+
+function renderVehicleStatsCards() {
+  const container = document.getElementById('vehicleStatsCards');
+  if (!container) return;
+  
+  const vehicles = cache.Vehicles || [];
+  
+  // කාණ්ඩ 5
+  const categories = [
+    { key: 'Bikes', types: ['bike'], label: 'Motor Bikes' },
+    { key: 'Luxury Vehicles', types: ['car', 'jeep', 'cab', 'suv'], label: 'Light Vehicles' },
+    { key: 'Vans & Bus', types: ['van', 'bus'], label: 'Vans & Buses (transport)' },
+    { key: 'Lorry', types: ['lorry', 'truck'], label: 'Freezer Trucks & Lorries' },
+    { key: 'Land Vehicles', types: ['tractor', 'excavator', 'jcb', 'backhoe'], label: 'Land Vehicles' }
+  ];
+
+  let html = `<div class="stats-row">`;
+  
+  categories.forEach(cat => {
+    // Type එක ගැලපෙන vehicles හොයන්න
+    const filtered = vehicles.filter(v => {
+      const type = (v.Type || '').toLowerCase().trim();
+      return cat.types.some(t => type.includes(t));
+    });
+    
+    const total = filtered.length;
+    
+    // Distinct Models ගණන (හිස් නොවන Model ගණන් කරන්න)
+    const models = new Set(
+      filtered.map(v => (v.Model || '').toLowerCase().trim()).filter(m => m !== '')
+    );
+    const modelCount = models.size;
+
+    // Status counts
+    const activeCount    = filtered.filter(v => (v.Status || '').trim() === 'Active').length;
+    const inServiceCount = filtered.filter(v => (v.Status || '').trim() === 'In Service').length;
+    const inactiveCount  = filtered.filter(v => (v.Status || '').trim() === 'Inactive').length;
+
+        html += `
+      <div class="stat-card accent-${cat.key.toLowerCase().replace(/[^a-z]/g, '')}">
+        <div class="stat-icon">${getVehicleTypeIcon(cat.key)}</div>
+        <div class="stat-content">
+          <div class="stat-title">${cat.label}</div>
+          <div class="stat-numbers">
+            <span class="stat-total">${total}</span>
+            <span class="stat-label">Vehicles</span>
+            <span class="stat-models">${modelCount} Models</span>
+          </div>
+          <div class="stat-status-row">
+            <span class="stat-status active"><span class="dot-status"></span>${activeCount}</span>
+            <span class="stat-status inservice"><span class="dot-status"></span>${inServiceCount}</span>
+            <span class="stat-status inactive"><span class="dot-status"></span>${inactiveCount}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 const MODULES = {
   vehicles: {
     sheet: "Vehicles",
@@ -206,6 +296,38 @@ document.getElementById("hamburgerBtn").addEventListener("click", () => {
   sidebar.classList.toggle("open");
 });
 
+// ==========================================
+// SIDEBAR TOGGLE (Desktop)
+// ==========================================
+const sidebarToggleBtn = document.getElementById("sidebarToggle");
+if (sidebarToggleBtn) {
+  // පෙර state එක localStorage එකෙන් restore කරන්න
+  const isCollapsed = localStorage.getItem("vms_sidebar_collapsed") === "true";
+  if (isCollapsed) {
+    document.querySelector(".app-shell").classList.add("sidebar-collapsed");
+    document.getElementById("sidebar").classList.add("collapsed");
+  }
+
+  sidebarToggleBtn.addEventListener("click", () => {
+    const shell = document.querySelector(".app-shell");
+    const sidebarEl = document.getElementById("sidebar");
+    
+    shell.classList.toggle("sidebar-collapsed");
+    sidebarEl.classList.toggle("collapsed");
+    
+    // State එක save කරන්න
+    const collapsed = shell.classList.contains("sidebar-collapsed");
+    localStorage.setItem("vms_sidebar_collapsed", collapsed ? "true" : "false");
+    
+    // Leaflet map එකක් තියෙනවා නම් resize
+    setTimeout(() => {
+      if (window.map && typeof window.map.invalidateSize === "function") {
+        window.map.invalidateSize();
+      }
+    }, 320);
+  });
+}
+
 function showView(key) {
   navItems.forEach((b) => b.classList.toggle("active", b.dataset.view === key));
   views.forEach((v) => v.classList.toggle("active", v.id === `view-${key}`));
@@ -217,8 +339,7 @@ function showView(key) {
   else if (key === "licenseInsurance") { renderLicenseInsuranceGroup(); }
   else if (MODULES[key]) renderModule(key);
   if (key === "dashboard") loadDashboard();
-  if (key === "tracking") loadTracking();
-  if (key === "reports") renderReports();
+  if (key === "tracking") loadTracking()
 }
 
 // ===================================================================
@@ -231,8 +352,18 @@ async function renderModule(key, targetId) {
   const resolvedTarget = targetId || `view-${key}`;
   moduleTargets[key] = resolvedTarget;
   const root = document.getElementById(resolvedTarget);
+  if (root.dataset.rendered === "true") {
+    return; // මෙතැනදීම function එක නවත්වන්න. table එක එලෙසම පෙනෙයි.
+  }
+    // Vehicle Master නම් පමණක් Cards Container එක එකතු කරන්න
+  let cardsHtml = '';
+  if (key === 'vehicles') {
+    cardsHtml = `<div id="vehicleStatsCards" class="stats-card-container"></div>`;
+  }
+
   root.innerHTML = `
     <div class="view-head"><h1>${mod.title}</h1></div>
+    ${cardsHtml}
     <div class="toolbar">
       <input type="search" placeholder="Search ${mod.title.toLowerCase()}…" id="search-${key}">
       <button class="btn btn-amber" id="addBtn-${key}">+ Add ${mod.singular || mod.title.slice(0, -1)}</button>
@@ -253,6 +384,11 @@ async function renderModule(key, targetId) {
     const rows = await Api.list(mod.sheet);
     cache[mod.sheet] = rows;
     paintRows(key, "");
+      // Vehicles නම් Cards පෙන්වන්න
+  if (key === 'vehicles') {
+    renderVehicleStatsCards();
+  }
+    root.dataset.rendered = "true";
   } catch (err) {
     document.getElementById(`tbody-${key}`).innerHTML =
       `<tr><td colspan="${mod.fields.length + 1}">❌ Couldn't load data — ${err.message}</td></tr>`;
@@ -273,9 +409,9 @@ function paintRows(key, filterText) {
   const noDeleteTabs = (currentUser && currentUser.noDeleteTabs) || [];
   const canEdit = !noEditTabs.includes(key.toLowerCase());
   const canDelete = !noDeleteTabs.includes(key.toLowerCase());
-  tbody.innerHTML = rows
+    tbody.innerHTML = rows
     .map(
-      (r) => `<tr>
+      (r) => `<tr data-id="${r[mod.idField]}">
         ${mod.fields.map((f) => `<td>${statusCell(f, r[f.key])}</td>`).join("")}
         <td class="row-actions">
           ${canEdit ? `<button title="Edit" onclick='openForm("${key}", ${JSON.stringify(r).replace(/'/g, "&apos;")})'>✎</button>` : ""}
@@ -339,7 +475,7 @@ function openForm(key, existing) {
           <input name="${f.key}" value="${val}" ${f.required ? "required" : ""}>
         </label>`;
       })
-      .join("") + `<button class="btn btn-primary" type="submit">${existing ? "Save changes" : "Add"}</button>`;
+              .join("") + `<button class="btn btn-primary" type="submit" id="modalSubmitBtn">${existing ? "Save changes" : "Add"}</button>`;
 
   if (existing) modalForm.dataset.id = existing[mod.idField];
   else delete modalForm.dataset.id;
@@ -388,6 +524,14 @@ function closeForm() {
 // 🔹 FIX: Submit with computed fields
 modalForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  
+  // ----- Submit Button එක හොයාගෙන disable කිරීම -----
+  const submitBtn = modalForm.querySelector('#modalSubmitBtn');
+  const originalText = submitBtn.textContent; // "Add" හෝ "Save changes"
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving...";
+  // -------------------------------------------------
+
   const mod = MODULES[activeModuleKey];
   const formData = new FormData(modalForm);
   const data = Object.fromEntries(formData.entries());
@@ -402,25 +546,85 @@ modalForm.addEventListener("submit", async (e) => {
   });
 
   try {
-    if (modalForm.dataset.id) {
-      data.id = modalForm.dataset.id;
+    let response = null;
+    const isUpdate = !!modalForm.dataset.id;
+
+        if (isUpdate) {
+      data[mod.idField] = modalForm.dataset.id;   // ✅ "ID" ලෙස set කරනවා (mod.idField = "ID")
       await Api.update(mod.sheet, data);
     } else {
-      await Api.add(mod.sheet, data);
+      response = await Api.add(mod.sheet, data);
+      data[mod.idField] = response.id;
     }
+
+    // ----- Save උනාට පස්සේ Button එක නැවත හරවන්න (Modal එක වැසීමට කලින්) -----
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
     closeForm();
-    renderModule(activeModuleKey, moduleTargets[activeModuleKey]);
+
+    // ----- ඉතිරි Cache / DOM Update Logic එක (කලින් කියාපු විදියටම) -----
+    const key = activeModuleKey;
+    const searchInput = document.getElementById(`search-${key}`);
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+    const tbody = document.getElementById(`tbody-${key}`);
+
+    if (isUpdate) {
+      const cacheIndex = cache[mod.sheet].findIndex(r => String(r[mod.idField]) === String(data.id));
+      if (cacheIndex !== -1) {
+        cache[mod.sheet][cacheIndex] = data;
+      }
+      const existingRow = tbody.querySelector(`tr[data-id="${data.id}"]`);
+      if (existingRow) {
+        const newRowHtml = renderSingleRow(key, data);
+        existingRow.outerHTML = newRowHtml;
+      } else {
+        cache[mod.sheet] = await Api.list(mod.sheet);
+        paintRows(key, searchInput ? searchInput.value : "");
+      }
+    } else {
+      cache[mod.sheet].push(data);
+      const rowString = JSON.stringify(data).toLowerCase();
+      if (rowString.includes(searchTerm)) {
+        const newRowHtml = renderSingleRow(key, data);
+        tbody.insertAdjacentHTML('beforeend', newRowHtml);
+      }
+    }
+        // ----- Add/Update කිරීමෙන් පසු Vehicles Cards Update කරන්න -----
+    if (key === 'vehicles') {
+      renderVehicleStatsCards();
+    }
+
   } catch (err) {
+    // ----- Error එකක් ආවොත් Button එක නැවත හරවන්න (Modal එක වසන්න එපා, userට නැවත try කරන්න දෙන්න) -----
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
     alert("Couldn't save: " + err.message);
   }
 });
 
 async function removeRow(key, id) {
-  const mod = MODULES[key];
+  const mod = MODULES[key]; // මෙය දැනටමත් තියෙනවා
   if (!confirm("Delete this record?")) return;
   try {
     await Api.remove(mod.sheet, id);
-    renderModule(key, moduleTargets[key]);
+
+    // 1. Cache එකෙන් ඒ row එක remove කරන්න
+    const cacheIndex = cache[mod.sheet].findIndex(r => String(r[mod.idField]) === String(id));
+    if (cacheIndex !== -1) {
+      cache[mod.sheet].splice(cacheIndex, 1);
+    }
+
+    // 2. DOM එකෙන් ඒ specific row එක remove කරන්න
+    const tbody = document.getElementById(`tbody-${key}`);
+    const rowToRemove = tbody.querySelector(`tr[data-id="${id}"]`);
+    if (rowToRemove) {
+      rowToRemove.remove();
+    }
+        // Delete කිරීමෙන් පසු Vehicles Cards Update කරන්න
+    if (key === 'vehicles') {
+      renderVehicleStatsCards();
+    }
+
   } catch (err) {
     alert("Couldn't delete: " + err.message);
   }
@@ -1057,169 +1261,6 @@ document.getElementById("pushLocationBtn").addEventListener("click", () => {
     { enableHighAccuracy: true }
   );
 });
-
-// ===================================================================
-// REPORT VIEWER
-// ===================================================================
-const reportTypeSelect = document.getElementById("reportType");
-reportTypeSelect.addEventListener("change", renderReports);
-document.getElementById("printReportBtn").addEventListener("click", () => window.print());
-document.getElementById("fuelReportFrom").addEventListener("change", renderReports);
-document.getElementById("fuelReportTo").addEventListener("change", renderReports);
-document.getElementById("fuelReportVehicle").addEventListener("change", renderReports);
-
-async function renderReports() {
-  const area = document.getElementById("reportArea");
-  const fuelFilters = document.getElementById("fuelReportFilters");
-  area.innerHTML = "Loading report…";
-  const type = reportTypeSelect.value;
-  fuelFilters.style.display = type === "fuel" ? "flex" : "none";
-
-  try {
-    if (type === "fleet") {
-      const vehicles = cache.Vehicles || (await Api.list("Vehicles"));
-      cache.Vehicles = vehicles;
-      area.innerHTML = reportTable(
-        "Fleet Summary",
-        ["Vehicle No", "Type", "Model", "Year", "Status"],
-        vehicles
-      );
-    } else if (type === "fuel") {
-      await renderFuelReport_();
-    } else if (type === "maintenance") {
-      const maintenance = cache.Maintenance || (await Api.list("Maintenance"));
-      cache.Maintenance = maintenance;
-      area.innerHTML = reportTable(
-        "Maintenance Schedule",
-        ["VehicleID", "ServiceType", "Date", "Cost", "NextDueDate"],
-        maintenance
-      );
-    }
-  } catch (err) {
-    area.innerHTML = `Couldn't load report (${err.message})`;
-  }
-}
-
-async function renderFuelReport_() {
-  const area = document.getElementById("reportArea");
-  const [fuel, vehicles] = await Promise.all([
-    cache.FuelLogs || Api.list("FuelLogs"),
-    cache.Vehicles || Api.list("Vehicles"),
-  ]);
-  cache.FuelLogs = fuel;
-  cache.Vehicles = vehicles;
-
-  const vehicleSelect = document.getElementById("fuelReportVehicle");
-  if (!vehicleSelect.dataset.populated) {
-    vehicleSelect.innerHTML =
-      `<option value="All">All Vehicles</option>` +
-      vehicles.map((v) => `<option value="${v["Vehicle No"]}">${v["Vehicle No"]}</option>`).join("");
-    vehicleSelect.dataset.populated = "true";
-  }
-
-  const fromVal = document.getElementById("fuelReportFrom").value;
-  const toVal = document.getElementById("fuelReportTo").value;
-  const selectedVehicle = vehicleSelect.value;
-
-  // 🔹 FIX: Proper date filtering
-  let rows = fuel.slice();
-  if (fromVal) {
-    const fromDate = new Date(fromVal + "T00:00:00");
-    rows = rows.filter((r) => {
-      if (!r.Date) return false;
-      const rDate = new Date(r.Date);
-      return rDate >= fromDate;
-    });
-  }
-  if (toVal) {
-    const toDate = new Date(toVal + "T23:59:59");
-    rows = rows.filter((r) => {
-      if (!r.Date) return false;
-      const rDate = new Date(r.Date);
-      return rDate <= toDate;
-    });
-  }
-  if (selectedVehicle && selectedVehicle !== "All") {
-    rows = rows.filter((r) => r.VehicleID === selectedVehicle);
-  }
-
-  const totalLiters = rows.reduce((s, r) => s + (Number(r.Liters) || 0), 0);
-  const totalCost = rows.reduce((s, r) => s + (Number(r.Cost) || 0), 0);
-
-  const vehicleInfo = selectedVehicle !== "All" ? vehicles.find((v) => v["Vehicle No"] === selectedVehicle) : null;
-  const vehicleLabel = selectedVehicle === "All" ? "All Vehicles" : selectedVehicle;
-  const departmentLabel = vehicleInfo ? (vehicleInfo.Department || "—") : "—";
-  const userLabel = vehicleInfo ? (vehicleInfo.User || "—") : "—";
-
-  area.innerHTML = `
-    <div class="report-header">
-      <h1>Fuel Cost Report</h1>
-      <div class="company-name">Imo Chicken &amp; Agro (Pvt) Ltd</div>
-    </div>
-
-    <div class="report-info-row">
-      <div class="report-info-col left">
-        <div><b>Vehicle No:</b> ${vehicleLabel}</div>
-        <div><b>Department:</b> ${departmentLabel}</div>
-        <div><b>User Name:</b> ${userLabel}</div>
-      </div>
-      <div class="report-info-col center">
-        <div><b>From Date:</b> ${fromVal || "—"}</div>
-        <div><b>To Date:</b> ${toVal || "—"}</div>
-      </div>
-      <div class="report-info-col right">
-        <div><b>Total Ltr:</b> ${formatLiters_(totalLiters)} Ltr</div>
-        <div><b>Total Cost:</b> ${formatNumber_(totalCost)}</div>
-      </div>
-    </div>
-
-    ${fuelReportTable_(rows, totalLiters, totalCost)}
-    <p class="hint">Generated ${new Date().toLocaleString()}</p>
-  `;
-}
-
-function formatLiters_(value) {
-  const n = Number(value);
-  if (isNaN(n)) return value ?? "";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fuelReportTable_(rows, totalLiters, totalCost) {
-  const columns = ["VehicleID", "Date", "Liters", "Cost", "Odometer"];
-  const plainCost = (v) => {
-    const n = Number(v);
-    return isNaN(n) ? (v ?? "") : n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  };
-  if (!rows.length) {
-    return `<table><thead><tr>${columns.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
-      <tbody><tr><td colspan="${columns.length}">No records for this filter.</td></tr></tbody></table>`;
-  }
-  return `<table>
-    <thead><tr>${columns.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
-    <tbody>
-      ${rows.map((r) => `<tr>${columns.map((c) => `<td>${c === "Cost" ? plainCost(r[c]) : r[c] ?? ""}</td>`).join("")}</tr>`).join("")}
-      <tr class="report-total-row">
-        <td><b>Total</b></td><td></td>
-        <td><b>${formatLiters_(totalLiters)} Ltr</b></td>
-        <td><b>${formatNumber_(totalCost)}</b></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>`;
-}
-
-function reportTable(title, columns, rows) {
-  return `
-    <h2 style="margin-bottom:10px">${title}</h2>
-    <table><thead><tr>${columns.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
-    <tbody>
-      ${rows.length
-        ? rows.map((r) => `<tr>${columns.map((c) => `<td>${r[c] ?? ""}</td>`).join("")}</tr>`).join("")
-        : `<tr><td colspan="${columns.length}">No records.</td></tr>`}
-    </tbody></table>
-    <p class="hint">Generated ${new Date().toLocaleString()}</p>
-  `;
-}
 
 // ===================================================================
 // MAINTENANCE & LICENSE/INSURANCE SUBTABS
