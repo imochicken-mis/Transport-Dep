@@ -909,3 +909,177 @@ html, body {
     overflow: visible;
   }
 }
+
+/* ============================================================
+   MOBILE & TABLET RESPONSIVE FIXES
+   ============================================================ */
+
+/* ---------- Tablet (≤ 1024px) ---------- */
+@media (max-width: 1024px) {
+  .content { padding: 18px 20px 20px; }
+  
+  .gauge-row { grid-template-columns: repeat(2, 1fr); }
+  
+  .lookup-triple-row { grid-template-columns: 1fr !important; }
+  
+  .panel-row { grid-template-columns: 1fr; }
+  
+  .lookup-grid { grid-template-columns: repeat(2, 1fr); }
+  
+  .tracking-grid { grid-template-columns: 1fr; }
+  
+  #map { height: 380px; }
+  
+  .view-head h1 { font-size: 22px; }
+}
+
+/* ---------- Mobile (≤ 760px) ---------- */
+@media (max-width: 760px) {
+  /* --- Shell --- */
+  .app-shell { grid-template-columns: 1fr; }
+  .content { padding: 14px 12px 20px; }
+  
+  /* --- View Head --- */
+  .view-head { padding-left: 0 !important; margin-bottom: 14px; }
+  .view-head h1 { font-size: 20px; }
+  .view-head .sub { font-size: 12.5px; }
+  .maintenance-head { flex-direction: column; align-items: flex-start; }
+  
+  /* --- Toolbar --- */
+  .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .toolbar input[type=search] { min-width: 0; width: 100%; }
+  .toolbar .btn, .toolbar .btn-amber, .toolbar .btn-primary { width: 100%; }
+  
+  /* --- Stat Cards --- */
+  .stats-row { grid-template-columns: 1fr; gap: 12px; }
+  .stat-card { padding: 14px 16px; gap: 14px; }
+  .stat-icon { width: 44px; height: 44px; font-size: 22px; }
+  .stat-total { font-size: 22px; }
+  .stat-status { width: 50px; font-size: 10.5px; }
+  
+  /* --- Gauges --- */
+  .gauge-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .gauge-card { padding: 12px; gap: 10px; }
+  .gauge { width: 50px; height: 50px; font-size: 15px; }
+  .gauge-label { font-size: 12px; }
+  .gauge-value { font-size: 16px; }
+  
+  /* --- Tables: horizontal scroll වෙන්න දෙන්න --- */
+  .table-scroll {
+    max-height: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { min-width: 720px; font-size: 12px; }
+  thead th { font-size: 10.5px; padding: 6px 8px; white-space: nowrap; }
+  tbody td { font-size: 12px; padding: 6px 8px; }
+  .row-actions button { font-size: 16px; padding: 4px; }
+  
+  /* --- Info Cards --- */
+  .lookup-grid { grid-template-columns: 1fr; gap: 12px; }
+  .info-card { padding: 12px 14px; }
+  .info-row { font-size: 12.5px; }
+  
+  /* --- Panels --- */
+  .panel { border-radius: 10px; }
+  .panel-body { padding: 12px 14px; }
+  .panel-head { padding: 10px 14px; }
+  .panel-head h2 { font-size: 14px; }
+  
+  /* --- Charts --- */
+  .chart-toolbar { flex-direction: column; align-items: flex-start; gap: 8px; margin-left: 0; }
+  .chart-toolbar h2 { font-size: 14px !important; }
+  .chart-toolbar select { width: 100%; }
+  .line-chart-svg, .combo-chart-svg { min-width: 0; }
+  
+  /* --- Chart Zoom --- */
+  .chart-zoom-controls { margin-left: auto; }
+  .chart-zoom-wrap { padding-bottom: 10px; }
+  
+  /* --- Combobox --- */
+  .combobox-wrap { max-width: 100%; margin-bottom: 10px; }
+  .combobox-wrap input { font-size: 13px; padding: 8px 10px; }
+  
+  /* --- Vehicle Image --- */
+  .vehicle-lookup-image {
+    width: 100%;
+    height: auto;
+    max-height: 180px;
+    margin: 10px 0 0 0;
+  }
+  
+  /* --- Modal --- */
+  .modal { max-width: 100%; max-height: 92vh; border-radius: 14px 14px 0 0; }
+  .modal-body { padding: 14px 16px; gap: 10px; }
+  .field input, .field select { font-size: 14px; padding: 10px 12px; }
+  
+  /* --- Tracking --- */
+  #map { height: 300px; }
+  .tracking-side { gap: 12px; }
+  
+  /* --- Reports --- */
+  .report-info-row { flex-direction: column; gap: 10px; }
+  .report-info-col.left,
+  .report-info-col.center,
+  .report-info-col.right {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    margin-right: 0 !important;
+    text-align: left;
+  }
+  .report-header h1 { font-size: 18px; margin-left: 0; }
+  .report-header .company-name { margin-left: 0; }
+  
+  /* --- Topbar --- */
+  .topbar { padding: 12px 14px; }
+  .topbar-title { font-size: 16px; }
+  
+  /* --- Subtabs --- */
+  .subtabs { width: 100%; overflow-x: auto; }
+  .subtab-btn { padding: 7px 14px; font-size: 12.5px; white-space: nowrap; }
+  
+  /* --- Sidebar (mobile: slide in from left) --- */
+  .sidebar { padding: 14px 14px 20px; }
+  .nav-item { font-size: 14px; padding: 10px 12px; }
+}
+
+/* ---------- Small Mobile (≤ 480px) ---------- */
+@media (max-width: 480px) {
+  .content { padding: 12px 10px 16px; }
+  
+  .gauge-row { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr; }
+  
+  .view-head h1 { font-size: 18px; }
+  
+  .stat-total { font-size: 20px; }
+  .stat-label { font-size: 12px; }
+  .stat-models { font-size: 11px; padding: 1px 8px; }
+  .stat-status { width: 46px; font-size: 10px; }
+  
+  table { min-width: 640px; }
+  
+  .modal { max-width: 100%; }
+  .modal-head h3 { font-size: 15px; }
+}
+
+@media (max-width: 760px) {
+  .table-scroll {
+    position: relative;
+  }
+  .table-scroll::after {
+    content: "→ scroll";
+    position: sticky;
+    right: 8px;
+    bottom: 8px;
+    float: right;
+    background: rgba(0, 36, 94, 0.75);
+    color: #fff;
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    pointer-events: none;
+    font-family: var(--body);
+  }
+}
