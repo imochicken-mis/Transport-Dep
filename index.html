@@ -31,8 +31,8 @@
     </button>
     <img src="images/logo.png" alt="Company logo" class="company-logo2">
     <div class="brand">
-      <span class="brand-name">Imo Chicken & Agro (Pvt) Ltd</span>
-      <span class="brand-subtitle">Vehicle Monitoring System</span>
+      <span class="brand-name">Vehicle Monitoring System</span>
+      <span class="brand-subtitle">Imo Chicken & Agro (Pvt) Ltd</span>
     </div>
     <nav class="nav">
   <button class="nav-item active" data-view="dashboard" data-tooltip="Dashboard"><span class="ico">📊</span>Dashboard</button>
@@ -46,14 +46,22 @@
   <button class="nav-item" data-view="licenseInsurance" data-tooltip="License & Insurance"><span class="ico">🛡️</span>License & Insurance</button>
   <button class="nav-item" data-view="Accident" data-tooltip="Accident Recorder"><span class="ico">⚠️</span>Accident Recorder</button>
   </nav>
-    <div class="sidebar-foot">
+        <div class="sidebar-foot">
       <span class="dot dot-live"></span> Apps Script API
       <div class="foot-status" id="apiStatus">checking…</div>
       <div class="foot-user" id="footUser"></div>
-      <button class="logout-btn" id="logoutBtn">Log out</button>
+      <div class="foot-buttons">
+        <button class="logout-btn" id="logoutBtn">Log out</button>
+        <button class="settings-btn" id="settingsBtn" title="User Settings" style="display:none;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </aside>
-  
+
   <!-- Topbar (mobile) -->
   <header class="topbar">
     <button class="hamburger" id="hamburgerBtn">☰</button>
@@ -64,72 +72,130 @@
   <main class="content">
 
     <!-- DASHBOARD -->
-    <section class="view active" id="view-dashboard">
-      <div class="view-head">
-        <h1>Fleet overview</h1>
-        <p class="sub">Real-time snapshot of every vehicle, driver and cost sheet.</p>
+            <section class="view active" id="view-dashboard">
+      
+            <!-- Tabs (Buttons) -->
+      <div class="dash-tabs">
+        <button class="dash-tab-btn active" data-target="fleet">Overall Analysis</button>
+        <button class="dash-tab-btn" data-target="vehicle">Individual Analysis</button>
       </div>
 
-      <div class="gauge-row" id="gaugeRow"><!-- gauges injected by JS --></div>
-
-      <div class="lookup-triple-row" style="grid-template-columns:1.6fr 1fr; margin-bottom:18px;">
-        <div class="panel">
-          <div class="chart-toolbar">
-            <h2 style="font-size:16px;">All Vehicles — Monthly Total Cost</h2>
-            <select id="fleetCostChartYear"></select>
+      <!-- 1. FLEET OVERVIEW SECTION -->
+      <div id="dash-fleet-section">
+        <div class="dashboard-top-row">
+          <div class="view-head">
+            <h1>Overall Analysis</h1>
+            <p class="sub">Real-time snapshot of every vehicle, driver and cost sheet.</p>
           </div>
-          <div class="panel-body" id="fleetCostChartContainer"></div>
-        </div>
-
-        <div class="panel">
-          <div class="chart-toolbar">
-            <h2 style="font-size:14px;">Top 10 Highest Cost Vehicles</h2>
-            <select id="topVehiclesMonth"></select>
-          </div>
-          <div class="panel-body table-scroll" id="topVehiclesList">Select a year first.</div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:18px;">
-        <div class="chart-toolbar">
-          <h2 style="font-size:16px;">All Vehicles — Monthly Total Fuel Comparison</h2>
-          <div style="display:flex; gap:8px;">
-            <select id="fleetFuelYear"></select>
-            <select id="fleetFuelType">
-              <option value="All">All (Diesel + Petrol)</option>
-              <option value="Diesel">Diesel</option>
-              <option value="Petrol">Petrol</option>
-            </select>
+          <div class="gauge-row" id="gaugeRow">
+             <div class="skeleton-loader" style="height: 90px; border-radius: 14px;"></div>
+             <div class="skeleton-loader" style="height: 90px; border-radius: 14px;"></div>
+             <div class="skeleton-loader" style="height: 90px; border-radius: 14px;"></div>
+             <div class="skeleton-loader" style="height: 90px; border-radius: 14px;"></div>
           </div>
         </div>
-        <div class="panel-body" id="fleetFuelComboChart">Loading…</div>
+
+        <div class="dashboard-charts-grid">
+          
+          <!-- Left Top: Cost Chart -->
+          <div class="panel dash-grid-cost">
+            <div class="chart-toolbar">
+              <h2 style="font-size:16px;">All Vehicles — Monthly Total Cost</h2>
+              <div style="display:flex; gap:8px;">
+                <select id="fleetCostChartYear"></select>
+                <select id="fleetCostChartMonth"></select>
+                <select id="fleetCostChartType">
+                  <option value="grand">Grand Total by Monthly</option>
+                  <option value="category">Category Total by Monthly</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-body" id="fleetCostChartContainer">
+              <div class="skeleton-loader" style="min-height: 240px;"></div>
+            </div>
+          </div>
+
+          <!-- Left Bottom: Fuel Chart -->
+          <div class="panel dash-grid-fuel">
+            <div class="chart-toolbar">
+              <h2 style="font-size:16px;">All Vehicles — Monthly Total Fuel Comparison</h2>
+              <div style="display:flex; gap:8px;">
+                <select id="fleetFuelYear"></select>
+                <select id="fleetFuelMonth"></select>
+                <select id="fleetFuelType">
+                  <option value="All">All (Diesel + Petrol)</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Petrol">Petrol</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-body" id="fleetFuelComboChart">
+              <div class="skeleton-loader" style="min-height: 180px;"></div>
+            </div>
+          </div>
+
+          <!-- Right: Top 10 List (Spans full height) -->
+          <div class="panel top-vehicles-panel dash-grid-top">
+            <div class="chart-toolbar">
+              <h2 style="font-size:14px;">Top 10 Highest Cost Vehicles</h2>
+              <select id="topVehiclesMonth"></select>
+            </div>
+            <div class="top-vehicles-legend">
+              <span><span class="swatch" style="background:#3B82F6"></span>Fuel</span>
+              <span><span class="swatch" style="background:#8B5CF6"></span>Lubricant</span>
+              <span><span class="swatch" style="background:#F59E0B"></span>Service</span>
+              <span><span class="swatch" style="background:#EF4444"></span>Repair</span>
+            </div>
+            <div class="panel-body table-scroll" id="topVehiclesList">
+               <div class="skeleton-loader" style="min-height: 100%;"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="lookup-triple-row" style="grid-template-columns:1fr 1fr; margin-top:18px;">
+          <div class="panel">
+            <div class="panel-head"><h2>License Expiring (within 7 days)</h2></div>
+            <div class="panel-body table-scroll" id="licenseExpiringList">
+              <div class="skeleton-loader sm"></div>
+              <div class="skeleton-loader sm"></div>
+              <div class="skeleton-loader sm"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Insurance Expiring (within 7 days)</h2></div>
+            <div class="panel-body table-scroll" id="insuranceExpiringList">
+              <div class="skeleton-loader sm"></div>
+              <div class="skeleton-loader sm"></div>
+              <div class="skeleton-loader sm"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="lookup-triple-row" style="grid-template-columns:1fr 1fr; margin-top:18px;">
-        <div class="panel">
-          <div class="panel-head"><h2>License Expiring (within 7 days)</h2></div>
-          <div class="panel-body table-scroll" id="licenseExpiringList">Loading…</div>
+      <!-- 2. VEHICLE OVERVIEW SECTION (Default: Hidden) -->
+      <div id="dash-vehicle-section" style="display: none;">
+        <div class="view-head">
+          <h1>Individual Analysis</h1>
+          <p class="sub">Select a vehicle to see every record linked to it in one place.</p>
         </div>
-        <div class="panel">
-          <div class="panel-head"><h2>Insurance Expiring (within 7 days)</h2></div>
-          <div class="panel-body table-scroll" id="insuranceExpiringList">Loading…</div>
+        <div class="toolbar" style="align-items:center;">
+          <div class="combobox-wrap">
+            <input type="text" id="vehicleLookupInput" placeholder="Type or click to select a vehicle no…" autocomplete="off">
+            <div class="combobox-dropdown" id="vehicleLookupDropdown"></div>
+          </div>
+          <img id="vehicleLookupImage" class="vehicle-lookup-image" style="display:none;">
         </div>
-      </div>
+        <div id="vehicleLookupResults">
+            <div class="lookup-grid">
+              <div class="skeleton-loader" style="height: 150px;"></div>
+              <div class="skeleton-loader" style="height: 150px;"></div>
+              <div class="skeleton-loader" style="height: 150px;"></div>
+              <div class="skeleton-loader" style="height: 150px;"></div>
+            </div>
+          </div>
+        </div>
 
-      <hr class="section-divider">
-
-      <div class="view-head" style="margin-top:30px;">
-        <h1>Vehicle Overview</h1>
-        <p class="sub">Select a vehicle to see every record linked to it in one place.</p>
-      </div>
-      <div class="toolbar" style="align-items:center;">
-        <div class="combobox-wrap">
-          <input type="text" id="vehicleLookupInput" placeholder="Type or click to select a vehicle no…" autocomplete="off">
-          <div class="combobox-dropdown" id="vehicleLookupDropdown"></div>
-        </div>
-        <img id="vehicleLookupImage" class="vehicle-lookup-image" style="display:none;">
-      </div>
-      <div id="vehicleLookupResults"><p class="hint">Select a vehicle above to see its full history.</p></div>
     </section>
 
     <!-- GENERIC CRUD VIEWS -->
@@ -158,6 +224,8 @@
 </section>
     <section class="view" id="view-Lubricant"></section>
     <section class="view" id="view-Accident"></section>
+        <!-- SETTINGS -->
+    <section class="view" id="view-settings"></section>
 
     <!-- TRACKING -->
     <section class="view" id="view-tracking">

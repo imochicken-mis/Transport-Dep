@@ -40,8 +40,8 @@ const Api = {
    * @param {Object} data - Record data (key-value pairs)
    * @returns {Promise<Object>} Response with new ID
    */
-  add(sheet, data) {
-    return this._post({ sheet, action: "add", data });
+  add(sheet, data, username) {
+    return this._post({ sheet, action: "add", data, user: username || "" });
   },
 
   /**
@@ -50,8 +50,8 @@ const Api = {
    * @param {Object} data - Record data including ID
    * @returns {Promise<Object>} Response
    */
-  update(sheet, data) {
-    return this._post({ sheet, action: "update", data });
+  update(sheet, data, username) {
+    return this._post({ sheet, action: "update", data, user: username || "" });
   },
 
   /**

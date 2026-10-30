@@ -96,13 +96,13 @@ body{ overflow:hidden; position:relative; }
 
     <form id="loginForm">
       <label class="field">
-        <span>Username</span>
-        <input type="text" id="username" required autofocus>
-      </label>
-      <label class="field" style="margin-top:12px">
-        <span>Password</span>
-        <input type="password" id="password" required>
-      </label>
+  <span>Username</span>
+  <input type="text" id="username" autocomplete="username" required autofocus>
+</label>
+<label class="field" style="margin-top:12px">
+  <span>Password</span>
+  <input type="password" id="password" autocomplete="current-password" required>
+</label>
       <p id="loginError"></p>
       <button class="btn btn-primary" type="submit">Log in</button>
       <h3>© 2026 MIS Dep. All rights reserved.</h3>
