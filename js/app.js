@@ -24,6 +24,12 @@ const chartCategoryVisibility_ = {
   repair: true,
 };
 
+const fuelComboVisibility_ = {
+  diesel: true,
+  petrol: true,
+  cost: true,
+};
+
 
 // ===================================================================
 // 2. MODULE DEFINITIONS
@@ -181,8 +187,26 @@ const MODULES = {
       { key: "Remarks", label: "Remarks", type: "text" },
     ],
   },
+  bookings: {
+    sheet: "Bookings",
+    title: "Vehicle Booking",
+    singular: "New Booking",
+    idField: "ID",
+    fields: [
+      { key: "ID", label: "ID", auto: true },
+      { key: "Vehicle No", label: "Vehicle No", type: "text", required: true },
+      { key: "Driver Name", label: "Driver Name", type: "text" }, // ⬅️ මේක අලුතෙන් එකතු කළා
+      { key: "Requested By", label: "Requested By", type: "text", required: true },
+      { key: "Department", label: "Department", type: "text" },
+      { key: "From Date", label: "From Date", type: "date", required: true },
+      { key: "From Time", label: "From Time (e.g. 08:00)", type: "time", required: true },
+      { key: "To Date", label: "To Date", type: "date", required: true },
+      { key: "To Time", label: "To Time (e.g. 17:00)", type: "time", required: true },
+      { key: "Destination", label: "Destination", type: "text" },
+      { key: "Purpose", label: "Purpose", type: "text" },
+    ],
+  },
 };
-
 
 // ===================================================================
 // 3. AUTO-MANAGED TIMESTAMP FIELDS
@@ -229,7 +253,7 @@ function applyTabPermissions_(user) {
   }
 }
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn")?.addEventListener("click", () => {
   sessionStorage.removeItem("vms_user");
   window.location.href = "login.html";
 });
@@ -249,7 +273,7 @@ navItems.forEach((btn) => {
 
 if (currentUser) applyTabPermissions_(currentUser);
 
-document.getElementById("hamburgerBtn").addEventListener("click", () => {
+document.getElementById("hamburgerBtn")?.addEventListener("click", () => {
   sidebar.classList.toggle("open");
 });
 
@@ -315,6 +339,8 @@ function showView(key) {
 
   if (key === "maintenance") { renderMaintenanceGroup(); }
   else if (key === "licenseInsurance") { renderLicenseInsuranceGroup(); }
+  // ✅ bookings සඳහා Table එක හදන්නේ නැතුව, Calendar එක විතරක් හදන්න
+  else if (key === "bookings") { loadBookingsView(); } 
   else if (MODULES[key]) renderModule(key);
 
   if (key === "dashboard" && !dashboardLoaded_) loadDashboard();
@@ -464,13 +490,30 @@ function statusCell(field, value) {
 const modalBackdrop = document.getElementById("modalBackdrop");
 const modalForm = document.getElementById("modalForm");
 const modalTitle = document.getElementById("modalTitle");
-document.getElementById("modalCloseBtn").addEventListener("click", closeForm);
+document.getElementById("modalCloseBtn")?.addEventListener("click", closeForm);
 
-function openForm(key, existing) {
+async function openForm(key, existing) {
   activeModuleKey = key;
   const mod = MODULES[key];
   const singularName = mod.singular || mod.title.slice(0, -1);
   modalTitle.textContent = existing ? `Edit ${singularName}` : `Add ${singularName}`;
+
+  // ✅ Booking Form එකට Driver Dropdown එක හදන්න
+  if (key === "bookings") {
+    try {
+      const drivers = await Api.list("Drivers");
+      cache.Drivers = drivers;
+      const driverNames = drivers.map(d => d.Name).filter(Boolean);
+      
+      const driverField = mod.fields.find(f => f.key === "Driver Name");
+      if (driverField) {
+        driverField.type = "select"; // text වෙනුවට select කරන්න
+        driverField.options = ["", ...driverNames]; // මුලින්ම හිස් එකක්, ඊට පස්සේ නම්
+      }
+    } catch (err) {
+      console.warn("Drivers load failed", err);
+    }
+  }
 
   modalForm.innerHTML =
     mod.fields
@@ -486,6 +529,11 @@ function openForm(key, existing) {
           const dateVal = val || (!existing ? todayISO_() : "");
           return `<label class="field"><span>${f.label}</span>
             <input type="date" name="${f.key}" value="${dateVal}" ${f.required ? "required" : ""}>
+          </label>`;
+        }
+        if (f.type === "time") {
+          return `<label class="field"><span>${f.label}</span>
+            <input type="time" name="${f.key}" value="${val}" ${f.required ? "required" : ""}>
           </label>`;
         }
         return `<label class="field"><span>${f.label}</span>
@@ -586,7 +634,7 @@ function showModalSavedToast_() {
   toast._timeout = setTimeout(() => toast.classList.remove("show"), 1400);
 }
 
-modalForm.addEventListener("submit", async (e) => {
+modalForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const submitBtn = modalForm.querySelector("#modalSubmitBtn");
@@ -616,6 +664,12 @@ modalForm.addEventListener("submit", async (e) => {
       data[mod.idField] = modalForm.dataset.id;
       await Api.update(mod.sheet, data, username);
     } else {
+      // ✅ අලුත් Booking එකක් නම් Status එක "Pending" කරන්න
+      if (activeModuleKey === "bookings") {
+        data["Status"] = "Pending";
+        data["Approved By"] = "";
+      }
+
       response = await Api.add(mod.sheet, data, username);
       data[mod.idField] = response.id;
 
@@ -636,30 +690,39 @@ modalForm.addEventListener("submit", async (e) => {
       showModalSavedToast_();
     }
 
+        // ----- ඉතිරි Cache / DOM Update Logic එක -----
     const key = activeModuleKey;
-    const searchInput = document.getElementById(`search-${key}`);
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
-    const tbody = document.getElementById(`tbody-${key}`);
 
-    if (isUpdate) {
-      const cacheIndex = cache[mod.sheet].findIndex((r) => String(r[mod.idField]) === String(data.id));
-      if (cacheIndex !== -1) cache[mod.sheet][cacheIndex] = data;
-
-      const existingRow = tbody.querySelector(`tr[data-id="${data.id}"]`);
-      if (existingRow) {
-        existingRow.outerHTML = renderSingleRow(key, data);
-      } else {
-        cache[mod.sheet] = await Api.list(mod.sheet);
-        paintRows(key, searchInput ? searchInput.value : "");
-      }
+    // ✅ අලුත් වෙනස්කම: Booking නම් Table එකට දත්ත දාන්නේ නැතුව Calendar එක Refresh කරන්න
+    if (key === "bookings") {
+      loadBookingsView(); // Calendar එක අලුත් කරනවා
     } else {
-      cache[mod.sheet].push(data);
-      const rowString = JSON.stringify(data).toLowerCase();
-      if (rowString.includes(searchTerm)) {
-        tbody.insertAdjacentHTML("beforeend", renderSingleRow(key, data));
+      // අනිත් සාමාන්‍ය Tabs වලට (Vehicles, Fuel, etc.) දත්ත දාන්නේ මෙතනින්
+      const searchInput = document.getElementById(`search-${key}`);
+      const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+      const tbody = document.getElementById(`tbody-${key}`);
+
+      if (isUpdate) {
+        const cacheIndex = cache[mod.sheet].findIndex((r) => String(r[mod.idField]) === String(data.id));
+        if (cacheIndex !== -1) cache[mod.sheet][cacheIndex] = data;
+
+        const existingRow = tbody.querySelector(`tr[data-id="${data.id}"]`);
+        if (existingRow) {
+          existingRow.outerHTML = renderSingleRow(key, data);
+        } else {
+          cache[mod.sheet] = await Api.list(mod.sheet);
+          paintRows(key, searchInput ? searchInput.value : "");
+        }
+      } else {
+        cache[mod.sheet].push(data);
+        const rowString = JSON.stringify(data).toLowerCase();
+        if (rowString.includes(searchTerm)) {
+          tbody.insertAdjacentHTML("beforeend", renderSingleRow(key, data));
+        }
       }
     }
 
+    // අනිත් Charts ටික අලුත් කරන්න
     if (key === "vehicles") renderVehicleStatsCards();
     if (key === "fuel") renderFuelOverview();
   } catch (err) {
@@ -868,9 +931,9 @@ async function loadFleetFuelChart_() {
     }
 
     const rerender = () => renderFleetFuelCombo_(Number(yearSelect.value), typeSelect.value, monthSelect.value);
-    yearSelect.addEventListener("change", rerender);
-    typeSelect.addEventListener("change", rerender);
-    monthSelect.addEventListener("change", rerender);
+    yearSelect?.addEventListener("change", rerender);
+    typeSelect?.addEventListener("change", rerender);
+    monthSelect?.addEventListener("change", rerender);
 
     renderFleetFuelCombo_(defaultYear, "All", "All");
   } catch (err) {
@@ -917,6 +980,21 @@ function renderFleetFuelCombo_(year, fuelType, monthVal) {
   if (fuelType === "All") {
     container.innerHTML = comboChartSvg_(dieselQty, costTotals, labels, "fleetFuelComboSvg", petrolQty, 180);
     attachComboHover_("fleetFuelComboSvg", dieselQty, costTotals, petrolQty, 180);
+
+    // ✅ Legend Click Events
+    document.querySelectorAll('.interactive-legend .legend-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const cat = e.currentTarget.dataset.cat;
+        fuelComboVisibility_[cat] = !fuelComboVisibility_[cat];
+
+        // අඩුම තරමින් එකක් හරි පේන්න තියෙන්න ඕන
+        if (!fuelComboVisibility_.diesel && !fuelComboVisibility_.petrol && !fuelComboVisibility_.cost) {
+           fuelComboVisibility_[cat] = true;
+        }
+        
+        renderFleetFuelCombo_(year, fuelType, monthVal);
+      });
+    });
   } else {
     const qtyTotals = (fuelType === "Diesel") ? dieselQty : petrolQty;
     container.innerHTML = comboChartSvg_(qtyTotals, costTotals, labels, "fleetFuelComboSvg", undefined, 180);
@@ -946,14 +1024,14 @@ async function loadFleetTotalCostChart_() {
     const defaultYear = years[0];
     yearSelect.innerHTML = years.map((y) => `<option value="${y}" ${y === defaultYear ? "selected" : ""}>${y}</option>`).join("");
 
-    yearSelect.addEventListener("change", (e) => {
+    yearSelect?.addEventListener("change", (e) => {
       const y = Number(e.target.value);
       renderFleetTotalCostChart_(y);
       setupTopVehiclesMonthFilter_(y);
     });
     
     const typeSelect = document.getElementById("fleetCostChartType");
-    typeSelect.addEventListener("change", () => {
+    typeSelect?.addEventListener("change", () => {
       renderFleetTotalCostChart_(Number(yearSelect.value));
     });
 
@@ -964,7 +1042,7 @@ async function loadFleetTotalCostChart_() {
         monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join("");
       monthSelect.dataset.populated = "true";
       
-      monthSelect.addEventListener("change", () => {
+      monthSelect?.addEventListener("change", () => {
         renderFleetTotalCostChart_(Number(yearSelect.value));
       });
     }
@@ -1573,7 +1651,7 @@ async function loadVehicleLookup_(vehicleNo) {
     `;
 
     renderMonthlyCostChart_(defaultYear);
-    document.getElementById("costChartYear").addEventListener("change", (e) => {
+    document.getElementById("costChartYear")?.addEventListener("change", (e) => {
       renderMonthlyCostChart_(Number(e.target.value));
     });
 
@@ -1746,38 +1824,65 @@ function smoothLinePath_(points) {
 
 function comboChartSvg_(qtyValues, costValues, customLabels, svgId, qtyValues2, customH) {
   const monthLabels = customLabels || ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const geo = comboChartGeometry_(qtyValues, costValues, qtyValues2, customH);
+  const isFleet = (svgId === "fleetFuelComboSvg" && qtyValues2 !== undefined);
+  const v = isFleet ? fuelComboVisibility_ : { diesel: true, petrol: true, cost: true };
 
-  const bars = qtyValues2 ? qtyValues.map((v, i) => {
+  // Hide කරපු ඒවා 0 කරන්න
+  const displayDiesel = v.diesel ? qtyValues : qtyValues.map(() => 0);
+  const displayPetrol = v.petrol && qtyValues2 ? qtyValues2 : (qtyValues2 ? qtyValues2.map(() => 0) : undefined);
+
+  const geo = comboChartGeometry_(displayDiesel, costValues, displayPetrol, customH);
+
+  const bars = displayPetrol ? displayDiesel.map((val, i) => {
           const gap = geo.barWidth * 0.15;
           const x1 = geo.xFor(i) - geo.barWidth - gap / 2;
           const x2 = geo.xFor(i) + gap / 2;
-          const v2 = qtyValues2[i];
-          const y1 = geo.yForQty(v);
+          const v2 = displayPetrol[i];
+          const y1 = geo.yForQty(val);
           const h1 = Math.max(geo.h - geo.padB - y1, 0);
           const y2 = geo.yForQty(v2);
           const h2 = Math.max(geo.h - geo.padB - y2, 0);
           return `
             <rect class="combo-bar combo-bar-a" x="${x1}" y="${y1}" width="${geo.barWidth}" height="${h1}" rx="3"></rect>
-            ${v > 0 ? `<text class="combo-bar-label" x="${x1 + geo.barWidth / 2}" y="${y1 - 6}" text-anchor="middle">${Math.round(v)} Ltr</text>` : ""}
+            ${val > 0 ? `<text class="combo-bar-label" x="${x1 + geo.barWidth / 2}" y="${y1 - 6}" text-anchor="middle">${Math.round(val)} Ltr</text>` : ""}
             <rect class="combo-bar combo-bar-b" x="${x2}" y="${y2}" width="${geo.barWidth}" height="${h2}" rx="3"></rect>
             ${v2 > 0 ? `<text class="combo-bar-label" x="${x2 + geo.barWidth / 2}" y="${y2 - 6}" text-anchor="middle">${Math.round(v2)} Ltr</text>` : ""}
           `;
         }).join("")
-    : qtyValues.map((v, i) => {
-          const barY = geo.yForQty(v);
+    : displayDiesel.map((val, i) => {
+          const barY = geo.yForQty(val);
           const barH = Math.max(geo.h - geo.padB - barY, 0);
           return `<rect class="combo-bar" x="${geo.xFor(i) - geo.barWidth / 2}" y="${barY}" width="${geo.barWidth}" height="${barH}" rx="3"></rect>
-            ${v > 0 ? `<text class="combo-bar-label" x="${geo.xFor(i)}" y="${barY - 6}" text-anchor="middle">${Math.round(v)} Ltr</text>` : ""}`;
+            ${val > 0 ? `<text class="combo-bar-label" x="${geo.xFor(i)}" y="${barY - 6}" text-anchor="middle">${Math.round(val)} Ltr</text>` : ""}`;
         }).join("");
 
-  const linePoints = costValues.map((v, i) => ({ x: geo.xFor(i), y: geo.yForCost(v) }));
-  const linePath = smoothLinePath_(linePoints);
+  const linePoints = costValues.map((val, i) => ({ x: geo.xFor(i), y: geo.yForCost(val) }));
+  const linePath = v.cost ? smoothLinePath_(linePoints) : "";
 
   const axisLabels = monthLabels.map((m, i) => {
       if (monthLabels.length > 15 && i % 5 !== 0 && i !== monthLabels.length - 1) return "";
       return `<text class="combo-axis-label" x="${geo.xFor(i)}" y="${geo.h - 22}" text-anchor="middle">${m}</text>`;
     }).join("");
+
+  const hoverElements = v.cost ? `
+      <circle id="${svgId || "fleetFuelComboSvg"}-dot" class="combo-hover-dot" r="3"></circle>
+      <rect id="${svgId || "fleetFuelComboSvg"}-label-bg" class="combo-hover-label-bg"></rect>
+      <text id="${svgId || "fleetFuelComboSvg"}-label" class="combo-hover-label"></text>
+  ` : "";
+
+  // ✅ අලුත් Clickable Legend එක
+  const legendHtml = `
+    <div class="combo-legend interactive-legend" style="justify-content: center;">
+      ${isFleet ? `
+        <span class="legend-item ${v.diesel ? '' : 'inactive'}" data-cat="diesel"><span class="swatch" style="background:rgb(10, 10, 141)"></span>Diesel Qty</span>
+        <span class="legend-item ${v.petrol ? '' : 'inactive'}" data-cat="petrol"><span class="swatch" style="background:rgb(74, 186, 247)"></span>Petrol Qty</span>
+        <span class="legend-item ${v.cost ? '' : 'inactive'}" data-cat="cost"><span class="swatch" style="background:rgb(54, 119, 249)"></span>Total Cost</span>
+      ` : `
+        <span><span class="swatch" style="background:rgb(10, 10, 141)"></span>Quantity (Ltr)</span>
+        <span><span class="swatch" style="background:rgb(54, 119, 249)"></span>Cost (Rs.)</span>
+      `}
+    </div>
+  `;
 
   return `
     <svg class="combo-chart-svg" id="${svgId || 'fleetFuelComboSvg'}" viewBox="0 0 ${geo.w} ${geo.h}" xmlns="http://www.w3.org/2000/svg">
@@ -1786,26 +1891,18 @@ function comboChartSvg_(qtyValues, costValues, customLabels, svgId, qtyValues2, 
       <line class="chart-axis-line" x1="${geo.padL}" y1="${geo.h - geo.padB + 15}" x2="${geo.w - geo.padR}" y2="${geo.h - geo.padB + 15}" />
       ${generateYAxisTicks_(Math.max(...costValues, 1) * 1.2, geo.h, geo.padT, geo.padB, geo.w, geo.padL, geo.padR).map(t => t.textLabel).join("")}
       ${bars}
-      <path class="combo-line-path" d="${linePath}"></path>
+      ${v.cost ? `<path class="combo-line-path" d="${linePath}"></path>` : ""}
       ${axisLabels}
-      <circle id="${svgId || "fleetFuelComboSvg"}-dot" class="combo-hover-dot" r="3"></circle>
-      <rect id="${svgId || "fleetFuelComboSvg"}-label-bg" class="combo-hover-label-bg"></rect>
-      <text id="${svgId || "fleetFuelComboSvg"}-label" class="combo-hover-label"></text>
+      ${hoverElements}
     </svg>
-    <div class="combo-legend" style="justify-content: center;">
-      ${qtyValues2 ? `
-        <span><span class="swatch" style="background:rgb(10, 10, 141)"></span>Diesel Qty (Ltr)</span>
-        <span><span class="swatch" style="background:rgb(74, 186, 247)"></span>Petrol Qty (Ltr)</span>
-        <span><span class="swatch" style="background:rgb(54, 119, 249)"></span>Total Cost (Rs.) — line, hover</span>
-      ` : `
-        <span><span class="swatch" style="background:rgb(10, 10, 141)"></span>Quantity (Ltr) — column</span>
-        <span><span class="swatch" style="background:rgb(54, 119, 249)"></span>Cost (Rs.) — line, hover to see values</span>
-      `}
-    </div>
+    ${legendHtml}
   `;
 }
 
 function attachComboHover_(svgId, qtyValues, costValues, qtyValues2, customH) {
+  // Cost Line එක hide කරලා නම් hover අවශ්‍ය නැහැ
+  if (svgId === "fleetFuelComboSvg" && !fuelComboVisibility_.cost) return;
+
   const svg = document.getElementById(svgId);
   const dot = document.getElementById(`${svgId}-dot`);
   const label = document.getElementById(`${svgId}-label`);
@@ -1872,8 +1969,8 @@ function setupVehicleFuelFilters_(fuelRows) {
     monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join("");
 
   const rerender = () => renderVehicleFuelChart_(fuelRows, Number(yearSelect.value), monthSelect.value);
-  yearSelect.addEventListener("change", rerender);
-  monthSelect.addEventListener("change", rerender);
+  yearSelect?.addEventListener("change", rerender);
+  monthSelect?.addEventListener("change", rerender);
 
   renderVehicleFuelChart_(fuelRows, defaultYear, "All");
 }
@@ -1928,7 +2025,7 @@ function setupTripleCostCharts_(lubeRows, serviceRows, repairRows, years) {
     yearSelect.innerHTML = years.map((y) => `<option value="${y}" ${y === defaultYear ? "selected" : ""}>${y}</option>`).join("");
 
     const render = () => renderSingleCostLineChart_(cfg.rows, Number(yearSelect.value), cfg.color, cfg.containerId, cfg.svgId, 9.5);
-    yearSelect.addEventListener("change", render);
+    yearSelect?.addEventListener("change", render);
     render();
   });
 }
@@ -1982,33 +2079,45 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
       const daysLeft = Math.round((toDate - today) / 86400000);
       return { ...r, daysLeft };
     })
-    .filter((r) => r.daysLeft >= 0 && r.daysLeft <= 7)
+    .filter((r) => r.daysLeft >= 0 && r.daysLeft <= 30)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
   const container = document.getElementById(containerId);
   if (!withDaysLeft.length) {
-    container.innerHTML = `<p class="hint">No vehicles expiring within 7 days.</p>`;
+    container.innerHTML = `
+      <div class="expiring-empty">
+        <span style="font-size: 24px; margin-bottom: 8px;">🎉</span>
+        <p>No vehicles expiring within 30 days.</p>
+      </div>`;
     return;
   }
 
-  const rowsHtml = withDaysLeft.map((r) => {
+  const html = withDaysLeft.map((r) => {
       const v = vehicles.find((veh) => veh["Vehicle No"] === r.VehicleID) || {};
-      const daysClass = r.daysLeft <= 3 ? "expiry-urgent" : "";
-      return `<tr>
-        <td>${r.VehicleID || ""}</td>
-        <td class="${daysClass}">${r.daysLeft}</td>
-        <td>${r.ToDate || ""}</td>
-        <td>${v.Department || ""}</td>
-        <td>${v.User || ""}</td>
-      </tr>`;
+      
+      // අවසන් වෙන දින ගණන අනුව පාට තීරණය කිරීම (දවස් 30ට)
+      let badgeClass = "safe";
+      let icon = "🟢";
+      if (r.daysLeft <= 7) { badgeClass = "urgent"; icon = "🔴"; }       // සතියකට අඩු
+      else if (r.daysLeft <= 14) { badgeClass = "warning"; icon = "🟡"; } // සති 2කට අඩු
+
+      return `
+      <div class="expiring-row">
+        <div class="exp-left">
+          <div class="exp-icon">🚗</div>
+          <div>
+            <div class="exp-vno">${r.VehicleID || "Unknown"}</div>
+            <div class="exp-sub">${v.Department || "No Dept"} • ${v.User || "No User"}</div>
+          </div>
+        </div>
+        <div class="exp-right">
+          <div class="exp-date">${r.ToDate || ""}</div>
+          <div class="exp-badge ${badgeClass}">${icon} ${r.daysLeft} Days</div>
+        </div>
+      </div>`;
     }).join("");
 
-  container.innerHTML = `<table>
-    <thead><tr>
-      <th>Vehicle No</th><th>Days Left</th><th>Expiry Date</th><th>Department</th><th>User Name</th>
-    </tr></thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>`;
+  container.innerHTML = `<div class="modern-expiring-list">${html}</div>`;
 }
 
 
@@ -2101,7 +2210,7 @@ async function loadTracking() {
   }
 }
 
-document.getElementById("pushLocationBtn").addEventListener("click", () => {
+document.getElementById("pushLocationBtn")?.addEventListener("click", () => {
   const vehicleId = document.getElementById("trackVehicleSelect").value;
   const status = document.getElementById("pushStatus");
   if (!vehicleId) { status.textContent = "Select a vehicle first."; return; }
@@ -2306,7 +2415,7 @@ async function renderFuelOverview() {
 
   const yearSelect = document.getElementById("fuelMonthlyYear");
   const renderMonthly = () => { renderMonthlyFuelLineChart_(Number(yearSelect.value)); };
-  yearSelect.addEventListener("change", renderMonthly);
+  yearSelect?.addEventListener("change", renderMonthly);
   renderMonthly();
 }
 
@@ -2492,8 +2601,8 @@ async function renderSettingsView_() {
     <p id="usersSaveStatus" class="hint" style="margin-top:8px;"></p>
   `;
 
-  document.getElementById("search-users").addEventListener("input", (e) => { paintUsersList_(e.target.value); });
-  document.getElementById("saveUsersBtn").addEventListener("click", saveUserChanges_);
+  document.getElementById("search-users")?.addEventListener("input", (e) => { paintUsersList_(e.target.value); });
+  document.getElementById("saveUsersBtn")?.addEventListener("click", saveUserChanges_);
 
   usersCache_ = null;
   Object.keys(pendingChanges_).forEach((k) => delete pendingChanges_[k]);
@@ -2733,3 +2842,433 @@ async function saveUserChanges_() {
   }
   loadDashboard();
 })();
+
+// ===================================================================
+// 21. VEHICLE BOOKING & CALENDAR VIEW
+// ===================================================================
+let bookingCalendar = null;
+
+async function loadBookingsView() {
+  const calendarEl = document.getElementById("bookingCalendar");
+  if (!calendarEl) return;
+
+  // ✅ Driver Filter එක Populate කරන්න
+  const driverFilter = document.getElementById("bookFilterDriver");
+  if (driverFilter && !driverFilter.dataset.populated) {
+    try {
+      const drivers = cache.Drivers || (await Api.list("Drivers"));
+      cache.Drivers = drivers;
+      const driverNames = drivers.map(d => d.Name).filter(Boolean);
+      
+      driverFilter.innerHTML = `<option value="All">All Drivers</option>` + 
+        driverNames.map(d => `<option value="${d}">${d}</option>`).join("");
+      driverFilter.dataset.populated = "true";
+    } catch (err) {
+      console.warn("Drivers load failed", err);
+    }
+  }
+
+  // දැනටමත් Calendar එකක් හදලා තියෙනවා නම් ආපහු හදන්නේ නැහැ
+  if (!bookingCalendar) {
+    bookingCalendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek'
+      },
+      height: '100%',
+      events: [],
+      dateClick: function(info) {
+        loadBookingsForDate(info.dateStr);
+      },
+      eventClick: function(info) {
+        const d = info.event.startStr.split('T')[0];
+        loadBookingsForDate(d);
+      }
+    });
+    bookingCalendar.render();
+  }
+
+  await fetchAndRenderBookings_();
+}
+
+async function fetchAndRenderBookings_() {
+  try {
+    const bookings = await Api.list("Bookings");
+    cache.Bookings = bookings;
+
+    // 1. දත්ත දින අනුව කාණ්ඩ කිරීම (Group by Date)
+    const bookingsByDate = {};
+    
+    // දිනය format කරන helper එකක් (YYYY-MM-DD)
+    const formatDate = (dateObj) => {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    bookings.forEach(b => {
+      if (!b["From Date"] || !b["To Date"]) return;
+      // Reject කරපු ඒවා Calendar එකේ පෙන්නන්නේ නැතුව ඉන්න (ඕන නම් මේ පේළිය අයින් කරන්න)
+      if (b.Status === "Rejected") return; 
+
+      let start = new Date(b["From Date"]);
+      let end = new Date(b["To Date"]);
+
+      // From Date ඉඳන් To Date වෙනකම් දවස් ගානේ loop වෙනවා
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = formatDate(d);
+        if (!bookingsByDate[dateStr]) {
+          bookingsByDate[dateStr] = [];
+        }
+        bookingsByDate[dateStr].push(b);
+      }
+    });
+
+    // 2. එක එක දවසට Events හදන්න (Count එක පෙන්නන්න)
+    const events = Object.keys(bookingsByDate).map(dateStr => {
+      const dayBookings = bookingsByDate[dateStr];
+      const count = dayBookings.length;
+      
+      // එදාට Pending ඒවා තියෙනවද බලලා පාට තීරණය කරමු
+      const hasPending = dayBookings.some(b => b.Status === "Pending");
+      const bgColor = hasPending ? "#d97706" : "#16a34a"; // Pending = කහ, Approved = කොළ
+
+      // "02 Bookings" විදියට format කරන්න (අංක 2කින් පෙන්නන්න)
+      const countStr = count.toString().padStart(2, '0');
+      const title = `${countStr} Booking${count > 1 ? 's' : ''}`;
+
+      return {
+        title: title,
+        start: dateStr,
+        allDay: true, 
+        backgroundColor: bgColor,
+        borderColor: bgColor,
+        textColor: '#ffffff'
+      };
+    });
+
+    bookingCalendar.removeAllEvents();
+    bookingCalendar.addEventSource(events);
+
+  } catch (err) {
+    console.error("Bookings load error:", err);
+  }
+}
+
+function loadBookingsForDate(dateStr) {
+  const titleEl = document.getElementById("selectedDateTitle");
+  const listEl = document.getElementById("bookingDetailsList");
+  
+  if (!dateStr) {
+    titleEl.textContent = `Select a date`;
+    return;
+  }
+
+  titleEl.textContent = `Bookings: ${dateStr}`;
+  
+  // Filter Values ලබා ගැනීම
+  const vFilter = (document.getElementById("bookFilterVehicle")?.value || "").toLowerCase().trim();
+  const dFilter = document.getElementById("bookFilterDriver")?.value || "All";
+  const tFilter = document.getElementById("bookFilterTime")?.value || "All";
+
+  // දත්ත Filter කිරීම
+  const bookings = (cache.Bookings || []).filter(b => {
+    // 1. දිනය ගැලපේද බැලීම
+    const isDateMatch = dateStr >= b["From Date"] && dateStr <= b["To Date"];
+    if (!isDateMatch) return false;
+
+    // 2. Vehicle No එක ගැලපේද බැලීම
+    const isVehicleMatch = String(b["Vehicle No"] || "").toLowerCase().includes(vFilter);
+    if (!isVehicleMatch) return false;
+
+    // 3. Driver ගැලපේද බැලීම
+    if (dFilter !== "All") {
+      if (String(b["Driver Name"] || "").trim() !== dFilter) return false;
+    }
+
+    // 4. වෙලාව ගැලපේද බැලීම
+    if (tFilter !== "All") {
+      const fromTime = b["From Time"] || "00:00";
+      const hour = parseInt(fromTime.split(":")[0], 10);
+      
+      if (tFilter === "Morning" && (hour < 6 || hour >= 12)) return false;
+      if (tFilter === "Afternoon" && (hour < 12 || hour >= 18)) return false;
+      if (tFilter === "Evening" && hour < 18) return false;
+    }
+
+    return true;
+  });
+
+  if (!bookings.length) {
+    listEl.innerHTML = `<div class="expiring-empty"><span style="font-size:24px; margin-bottom:8px;">📭</span><p>No bookings found for this filter.</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = bookings.map(b => {
+    const statusClass = b.Status === "Approved" ? "status-approved" : (b.Status === "Rejected" ? "status-rejected" : "status-pending");
+    
+    // Transport Officer ට ඕනෑම වෙලාවක Approve/Reject කරන්න පුළුවන් වෙන්න ඕන නිසා (කලින් Admin ට විතරක් තිබ්බ එක අයින් කළා)
+    const showActions = b.Status === "Pending";
+
+    // වෙලාව ලස්සනට පෙන්නන්න (උදා: 08:30 AM)
+        // වෙලාව ලස්සනට පෙන්නන්න (ඕනෑම format එකකට වැඩ කරන්න)
+    const formatTime = (timeStr) => {
+      if (!timeStr) return "--:--";
+      
+      let timeOnly = timeStr;
+
+      // 1. Google Sheets වලින් Date String එකක් ආවොත් (උදා: 2026-11-02T08:00:00.000Z)
+      if (typeof timeStr === "string" && timeStr.includes("T")) {
+        timeOnly = timeStr.split("T")[1].substring(0, 5);
+      }
+
+      // 2. සාමාන්‍ය වෙලාවක් ආවොත් (උදා: 08:00)
+      if (typeof timeOnly === "string" && timeOnly.includes(":")) {
+        let [h, m] = timeOnly.split(":");
+        h = parseInt(h, 10);
+        let ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${m} ${ampm}`;
+      }
+
+      return timeStr; // අවසාන වශයෙන් එහෙම්මම යවන්න
+    };
+
+    return `
+      <div class="booking-item">
+        <div class="booking-item-header">
+          <span class="booking-vehicle">${b["Vehicle No"]}</span>
+          <span class="booking-time-pill">🕒 ${formatTime(b["From Time"])} - ${formatTime(b["To Time"])}</span>
+        </div>
+        
+        <div class="booking-details-grid">
+          <span>Driver:</span> <span><b>${b["Driver Name"] || "Not Assigned"}</b></span>
+          <span>Requested By:</span> <span>${b["Requested By"]} (${b["Department"]})</span>
+          <span>Destination:</span> <span>${b["Destination"]}</span>
+          <span>Purpose:</span> <span>${b["Purpose"]}</span>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="booking-status-badge ${statusClass}">${b.Status}</span>
+          ${b["Approved By"] ? `<span style="font-size:10px; color:#999;">By: ${b["Approved By"]}</span>` : ""}
+        </div>
+
+        ${showActions ? `
+          <div class="booking-actions">
+            <button class="btn-approve" onclick="updateBookingStatus('${b.ID}', 'Approved')">Approve</button>
+            <button class="btn-reject" onclick="updateBookingStatus('${b.ID}', 'Rejected')">Reject</button>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+async function updateBookingStatus(id, newStatus) {
+  if (!confirm(`Are you sure you want to mark this as ${newStatus}?`)) return;
+  
+  const booking = cache.Bookings.find(b => String(b.ID) === String(id));
+  if (!booking) return;
+
+  try {
+    const payload = {
+      ID: id,
+      Status: newStatus,
+      "Approved By": currentUser.username
+    };
+    await Api.update("Bookings", payload, currentUser.username);
+    
+    // Refresh data
+    await fetchAndRenderBookings_();
+    
+    // Refresh the detail list (using the currently selected date)
+    const titleText = document.getElementById("selectedDateTitle").textContent;
+    const dateStr = titleText.replace("Bookings for ", "");
+    loadBookingsForDate(dateStr);
+    
+  } catch (err) {
+    alert("Couldn't update status: " + err.message);
+  }
+}
+
+// Filter වලට Event Listeners
+document.addEventListener("DOMContentLoaded", () => {
+  const vFilterInput = document.getElementById("bookFilterVehicle");
+  const tFilterSelect = document.getElementById("bookFilterTime");
+
+  if (vFilterInput && tFilterSelect) {
+    const applyFilter = () => {
+      const titleText = document.getElementById("selectedDateTitle").textContent;
+      const dateStr = titleText.replace("Bookings: ", "");
+      if (dateStr !== "Select a date") {
+        loadBookingsForDate(dateStr);
+      }
+    };
+
+    vFilterInput.addEventListener("input", applyFilter);
+    tFilterSelect.addEventListener("change", applyFilter);
+    
+    // ✅ Driver Filter එකටත් Event Listener එක දාන්න
+    const dFilterSelect = document.getElementById("bookFilterDriver");
+    if (dFilterSelect) {
+      dFilterSelect.addEventListener("change", applyFilter);
+    }
+  }
+});
+
+// ===================================================================
+// 22. BOOKING REPORT DOWNLOAD (CSV / PDF)
+// ===================================================================
+document.addEventListener("DOMContentLoaded", () => {
+  const reportBtn = document.getElementById("downloadReportBtn");
+  const reportModal = document.getElementById("reportModalBackdrop");
+  const closeReportBtn = document.getElementById("closeReportModalBtn");
+  const csvBtn = document.getElementById("downloadCsvBtn");
+  const pdfBtn = document.getElementById("downloadPdfBtn");
+
+  if (reportBtn && reportModal) {
+    // 1. Open Modal
+    reportBtn.addEventListener("click", () => {
+      // Set today's date as default
+      const today = new Date().toISOString().split("T")[0];
+      if (!document.getElementById("reportFromDate").value) {
+        document.getElementById("reportFromDate").value = today;
+        document.getElementById("reportToDate").value = today;
+      }
+      reportModal.classList.add("open");
+    });
+
+    // 2. Close Modal
+    closeReportBtn.addEventListener("click", () => {
+      reportModal.classList.remove("open");
+    });
+
+    // 3. Filter Data Function
+    const getFilteredBookings_ = () => {
+      const fromDate = document.getElementById("reportFromDate").value;
+      const toDate = document.getElementById("reportToDate").value;
+      
+      if (!fromDate || !toDate) {
+        alert("Please select both dates.");
+        return null;
+      }
+
+      return (cache.Bookings || []).filter(b => {
+        // Check if Booking Date Range overlaps with Filter Date Range
+        return (b["From Date"] <= toDate && b["To Date"] >= fromDate);
+      });
+    };
+
+    // 4. CSV Download
+    csvBtn.addEventListener("click", () => {
+      const data = getFilteredBookings_();
+      if (!data) return;
+
+      if (data.length === 0) {
+        alert("No bookings found for this date range.");
+        return;
+      }
+
+      const headers = ["ID", "Vehicle No", "Driver Name", "Requested By", "Department", "From Date", "From Time", "To Date", "To Time", "Destination", "Purpose", "Status", "Approved By"];
+      
+      // Build CSV String
+      const csvRows = [];
+      csvRows.push(headers.join(",")); // Headers
+
+      data.forEach(b => {
+        const row = headers.map(h => {
+          let val = b[h] === undefined || b[h] === null ? "" : b[h].toString();
+          return `"${val.replace(/"/g, '""')}"`; // Escape commas
+        });
+        csvRows.push(row.join(","));
+      });
+
+      // Add BOM (\uFEFF) for Excel UTF-8 support
+      const csvContent = "\uFEFF" + csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Booking_Report_${document.getElementById("reportFromDate").value}_to_${document.getElementById("reportToDate").value}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // 5. PDF Download (via Print Window)
+    pdfBtn.addEventListener("click", () => {
+      const data = getFilteredBookings_();
+      if (!data) return;
+
+      if (data.length === 0) {
+        alert("No bookings found for this date range.");
+        return;
+      }
+
+      const fromDate = document.getElementById("reportFromDate").value;
+      const toDate = document.getElementById("reportToDate").value;
+
+      // Build HTML Table for Print
+      let tableRows = data.map(b => `
+        <tr>
+          <td>${b["Vehicle No"]}</td>
+          <td>${b["Requested By"]}</td>
+          <td>${b["Department"]}</td>
+          <td>${b["From Date"]} ${b["From Time"] || ""}</td>
+          <td>${b["To Date"]} ${b["To Time"] || ""}</td>
+          <td>${b["Destination"]}</td>
+          <td>${b["Status"]}</td>
+        </tr>
+      `).join("");
+
+      const printContent = `
+        <html>
+        <head>
+          <title>Booking Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h2 { text-align: center; color: #00245E; margin-bottom: 5px; }
+            p { text-align: center; font-size: 12px; color: #555; margin-top: 0; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #00245E; color: white; }
+          </style>
+        </head>
+        <body>
+          <h2>Vehicle Booking Report</h2>
+          <p>From ${fromDate} To ${toDate}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Vehicle No</th>
+                <th>Driver Name</th>
+                <th>Requested By</th>
+                <th>Department</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Destination</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      // Open a new window and trigger Print Dialog (User can Save as PDF)
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    });
+  }
+});

@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
 
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -45,6 +46,7 @@
   <button class="nav-item" data-view="maintenance" data-tooltip="Service & Maintenance"><span class="ico">🔧</span>Service & Maintenance</button>
   <button class="nav-item" data-view="licenseInsurance" data-tooltip="License & Insurance"><span class="ico">🛡️</span>License & Insurance</button>
   <button class="nav-item" data-view="Accident" data-tooltip="Accident Recorder"><span class="ico">⚠️</span>Accident Recorder</button>
+  <button class="nav-item" data-view="bookings" data-tooltip="Vehicle Booking"><span class="ico">📅</span>Vehicle Booking</button>
   </nav>
         <div class="sidebar-foot">
       <span class="dot dot-live"></span> Apps Script API
@@ -155,7 +157,7 @@
 
         <div class="lookup-triple-row" style="grid-template-columns:1fr 1fr; margin-top:18px;">
           <div class="panel">
-            <div class="panel-head"><h2>License Expiring (within 7 days)</h2></div>
+            <div class="panel-head"><h2>License Expiring (within 30 days)</h2></div>
             <div class="panel-body table-scroll" id="licenseExpiringList">
               <div class="skeleton-loader sm"></div>
               <div class="skeleton-loader sm"></div>
@@ -163,7 +165,7 @@
             </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h2>Insurance Expiring (within 7 days)</h2></div>
+            <div class="panel-head"><h2>Insurance Expiring (within 30 days)</h2></div>
             <div class="panel-body table-scroll" id="insuranceExpiringList">
               <div class="skeleton-loader sm"></div>
               <div class="skeleton-loader sm"></div>
@@ -224,6 +226,53 @@
 </section>
     <section class="view" id="view-Lubricant"></section>
     <section class="view" id="view-Accident"></section>
+    <!-- BOOKING VIEW -->
+    <section class="view" id="view-bookings">
+      <div class="view-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h1>Vehicle Booking</h1>
+          <p class="sub">Book vehicles and view schedules in calendar.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary" onclick="openForm('bookings')">+ New Booking</button>
+          <button class="btn btn-amber" id="downloadReportBtn">📥 Report</button>
+        </div>
+      </div>
+  
+  <div class="booking-layout">
+    <!-- Calendar -->
+    <div class="panel booking-calendar-panel">
+      <div class="panel-body" id="bookingCalendar"></div>
+    </div>
+    
+    <!-- Selected Date Details -->
+        <!-- Selected Date Details -->
+        <div class="panel booking-details-panel">
+          <div class="panel-head" style="background:#00245E; color:white; height:auto; padding:10px 15px;">
+            <h2 style="font-size:14px; color:white; margin:0;" id="selectedDateTitle">Select a date</h2>
+          </div>
+          
+          <!-- ⬇️ අලුත් Filter බාර් එක ⬇️ -->
+          <div class="booking-filters" style="flex-wrap: wrap;"> <!-- flex-wrap එකතු කළා -->
+            <input type="text" id="bookFilterVehicle" placeholder="Filter by Vehicle..." style="flex: 1 1 45%;">
+            <select id="bookFilterDriver" style="flex: 1 1 45%;">
+              <option value="All">All Drivers</option>
+            </select>
+            <select id="bookFilterTime" style="flex: 1 1 100%;">
+              <option value="All">All Times</option>
+              <option value="Morning">Morning (6am - 12pm)</option>
+              <option value="Afternoon">Afternoon (12pm - 6pm)</option>
+              <option value="Evening">Evening (After 6pm)</option>
+            </select>
+          </div>
+          <!-- ⬆️ අලුත් Filter බාර් එක ⬆️ -->
+
+          <div class="panel-body table-scroll" id="bookingDetailsList">
+            <p class="hint">Click a date on the calendar to view bookings.</p>
+          </div>
+        </div>
+  </div>
+</section>
         <!-- SETTINGS -->
     <section class="view" id="view-settings"></section>
 
@@ -258,7 +307,7 @@
 </div>
 
 <!-- Reusable modal for add/edit forms -->
-<div class="modal-backdrop" id="modalBackdrop">
+ <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
     <div class="modal-head">
       <h3 id="modalTitle">Add record</h3>
@@ -267,7 +316,31 @@
     <form id="modalForm" class="modal-body"></form>
   </div>
 </div>
+<!-- Report Download Modal -->
+<div class="modal-backdrop" id="reportModalBackdrop">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-head">
+      <h3>📄 Download Booking Report</h3>
+      <button class="modal-close" id="closeReportModalBtn">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span>From Date</span>
+        <input type="date" id="reportFromDate">
+      </label>
+      <label class="field" style="margin-top: 10px;">
+        <span>To Date</span>
+        <input type="date" id="reportToDate">
+      </label>
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button class="btn btn-primary" id="downloadCsvBtn" style="flex: 1;">Download CSV</button>
+        <button class="btn btn-amber" id="downloadPdfBtn" style="flex: 1;">Download PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
