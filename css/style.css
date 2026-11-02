@@ -3134,3 +3134,50 @@ html, body {
     grid-row: auto !important;
   }
 }
+
+/* ============================================
+   MOBILE FIXES FOR BOOKING & CALENDAR
+   ============================================ */
+@media (max-width: 900px) {
+  /* 1. Booking Layout එක උඩින් පහළට වැටෙන්න සලස්වන්න */
+  .booking-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 20px !important;
+  }
+
+  /* 2. Calendar එකේ උස Mobile එකට හරියටම සකසන්න */
+  .booking-calendar-panel {
+    height: auto !important;
+    min-height: 500px;
+    width: 100% !important;
+  }
+
+  /* 3. 🔴 වැදගත්ම දේ: FullCalendar එකේ Table එකට පොදු 720px පළල එක වැළැක්වීම */
+  .fc table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 4. "Select a date" පැනල් එකේ නිකරුණේ එන '→ scroll' ලේබලය අයින් කිරීම */
+  .booking-details-panel .table-scroll::after {
+    display: none !important;
+  }
+
+  /* 5. Calendar එකේ Font එක සහ ඉඩ ප්‍රමාණය Mobile එකට ගැලපීම */
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 16px !important;
+  }
+  .fc th {
+    font-size: 10px !important;
+    padding: 5px 2px !important;
+  }
+  .fc td {
+    padding: 2px !important;
+  }
+}
