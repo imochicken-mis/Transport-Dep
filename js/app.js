@@ -7,6 +7,10 @@
 // ===================================================================
 const cache = {};
 let dashboardLoaded_ = false;
+let bookingsLoaded_ = false;
+let jobCardsLoaded_ = false;
+let attendanceLoaded_ = false;
+let trackingLoaded_ = false;
 let activeModuleKey = null;
 let currentVehicleLookup_ = null;
 let map, markersLayer;
@@ -30,6 +34,12 @@ const fuelComboVisibility_ = {
   cost: true,
 };
 
+let currentVehicleTypeFilter_ = null;
+let attendanceDate_ = new Date().toISOString().split("T")[0]; // අද දිනය
+let attendanceDept_ = "Transport";
+let currentEmployeeDept_ = "Transport"; // Default
+let pendingHighlightVehicle_ = null; // Row එක Highlight කරන්න ඕන වාහනේ
+
 
 // ===================================================================
 // 2. MODULE DEFINITIONS
@@ -43,33 +53,60 @@ const MODULES = {
     fields: [
       { key: "ID", label: "ID", auto: true },
       { key: "Vehicle No", label: "Vehicle No", type: "text", required: true },
-      { key: "Type", label: "Type", type: "text" },
+      { key: "Type", label: "Type", type: "select", options: ["MOTOR CYCLE", "MOTOR CARS- JEEPS & DOUBLE CABS", "DUAL PURPOSE - SINGLE CAB", "DUAL PURPOSE -VAN", "THREE WHEELER", "MOTOR COACH-BUS", "MOTOR LORRY", "MOTOR LORRY-DUMP TRUCK", "SPECIAL PURPOSE -MACHINE", "TRACTOR", "TRACTOR TRAILER"] },
       { key: "Model", label: "Model", type: "text" },
       { key: "Make", label: "Make", type: "text" },
       { key: "Year", label: "Year", type: "text" },
       { key: "ChassisNo", label: "Chassis No", type: "text" },
       { key: "EngineNo", label: "Engine No", type: "text" },
+      { key: "CylinderCapacity", label: "Cylinder Capacity", type: "text" },
+      { key: "FuelType", label: "Fuel Type", type: "select", options: ["Petrol", "Diesel"] },
       { key: "CurrentOwner", label: "Current Owner", type: "text" },
+      { key: "Location", label: "Location", type: "text" },
       { key: "Department", label: "Department", type: "text" },
       { key: "User", label: "User/Driver", type: "text" },
+      { key: "UserPosition", label: "User Position", type: "text" },
+      { key: "UserMobile", label: "User Mobile", type: "number" },
+      { key: "UserMail", label: "User Mail", type: "text" },
       { key: "Status", label: "Status", type: "select", options: ["Active", "In Service", "Inactive"] },
     ],
   },
   drivers: {
-    sheet: "Drivers",
+    sheet: "Drivers", 
     title: "Driver Master",
     singular: "New Driver",
     idField: "ID",
+    defaultDept: "Transport", // අලුතෙන් එකතු කළා
     fields: [
       { key: "ID", label: "ID", auto: true },
-      { key: "Name", label: "User Name", type: "text", required: true },
+      { key: "MPLNO", label: "MPL No", type: "text", required: true },
+      { key: "Name", label: "Driver Name", type: "text", required: true },
       { key: "NICNO", label: "NIC Number", type: "text" },
       { key: "Phone", label: "Phone", type: "text" },
       { key: "Address", label: "Home Address", type: "text" },
       { key: "License", label: "License No", type: "text" },
       { key: "LicenseExpiryDate", label: "License Expiry Date", type: "date" },
       { key: "AssignedVehicle", label: "Assigned Plate No", type: "text" },
-      { key: "Department", label: "Department", type: "text" },
+      { key: "Position", label: "Position", type: "text"},
+      { key: "Status", label: "Status", type: "select", options: ["Active", "Inactive"] },
+      { key: "Department", label: "Department", auto: true, hidden: true }, // Form එකේ පෙන්නන්නේ නැහැ
+    ],
+  },
+  mechanics: {
+    sheet: "Drivers", 
+    title: "Mechanic Master",
+    singular: "New Mechanic",
+    idField: "ID",
+    defaultDept: "Automobile", // අලුතෙන් එකතු කළා
+    fields: [
+      { key: "ID", label: "ID", auto: true },
+      { key: "Name", label: "Mechanic Name", type: "text", required: true },
+      { key: "NICNO", label: "NIC Number", type: "text" },
+      { key: "Phone", label: "Phone", type: "text" },
+      { key: "Address", label: "Home Address", type: "text" },
+      { key: "License", label: "Specialization (e.g. Engine, Electrical)", type: "text" }, // License වෙනුවට Mechanic ට Specialization එකක්
+      { key: "Status", label: "Status", type: "select", options: ["Active", "Inactive"] },
+      { key: "Department", label: "Department", auto: true, hidden: true }, 
     ],
   },
   fuel: {
@@ -111,6 +148,7 @@ const MODULES = {
     idField: "ID",
     fields: [
       { key: "ID", label: "ID", auto: true },
+      { key: "JobCardNo", label: "Job Card No", type: "text"},
       { key: "VehicleID", label: "Vehicle No", type: "text", required: true },
       { key: "Date", label: "Date", type: "date", required: true },
       { key: "RepairArea", label: "Repair Area", type: "select", options: ["-", "Engine System", "Brake System", "Light System", "Electrical System", "Suspension System", "AC System", "Body/Chassis", "Other"] },
@@ -158,6 +196,7 @@ const MODULES = {
     idField: "ID",
     fields: [
       { key: "ID", label: "ID", auto: true },
+      { key: "JobCardNo", label: "Job Card No", type: "text"},
       { key: "VehicleID", label: "Vehicle No", type: "text" },
       { key: "Date", label: "Date", type: "date" },
       { key: "Category", label: "Lubricant Category", type: "select", options: ["-", "Engine Oil", "Gear Oil"] },
@@ -204,6 +243,27 @@ const MODULES = {
       { key: "To Time", label: "To Time (e.g. 17:00)", type: "time", required: true },
       { key: "Destination", label: "Destination", type: "text" },
       { key: "Purpose", label: "Purpose", type: "text" },
+    ],
+  },
+    jobcards: {
+    sheet: "JobCards",
+    title: "Workshop Jobs",
+    singular: "New Job",
+    idField: "ID",
+    fields: [
+      { key: "ID", label: "ID", auto: true },
+      { key: "Vehicle No", label: "Vehicle No", type: "text", required: true },
+      { key: "Requested By", label: "Requested By", type: "text", required: true },
+      { key: "Date", label: "Date", type: "date" },
+      { key: "Job Type", label: "Job Type", type: "select", options: ["Repair", "Service", "Inspection", "Other"] },
+      { key: "Description", label: "Description / Issue", type: "text", required: true },
+      { key: "Priority", label: "Priority", type: "select", options: ["High", "Medium", "Low"] },
+      { key: "Assigned To", label: "Assigned To (Mechanic)", type: "text" },
+      { key: "Other Details", label: "Other Repairs / Issues", type: "text" }, // ⬅️ අලුතෙන් එකතු කළා
+      { key: "Remarks", label: "Remarks", type: "text" },
+      { key: "Complete Date", label: "Complete Date", auto: true, hidden: true },
+      { key: "Final Cost", label: "Final Cost (Rs.)", auto: true, hidden: true },
+      { key: "Feedback", label: "Feedback for Mechanic", auto: true, hidden: true },
     ],
   },
 };
@@ -308,21 +368,30 @@ if (sidebarToggleBtn) {
 // ===================================================================
 document.addEventListener("DOMContentLoaded", () => {
   const tabBtns = document.querySelectorAll(".dash-tab-btn");
+  const kpiSection = document.getElementById("dash-kpi-section");
   const fleetSection = document.getElementById("dash-fleet-section");
   const vehicleSection = document.getElementById("dash-vehicle-section");
 
-  if (tabBtns.length > 0 && fleetSection && vehicleSection) {
+  if (tabBtns.length > 0 && kpiSection && fleetSection && vehicleSection) {
     tabBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
+        // 1. හැම බටන් එකකින්ම active class එක අයින් කරන්න
         tabBtns.forEach((b) => b.classList.remove("active"));
+        // 2. එබපු බටන් එකට active class එක දාන්න
         btn.classList.add("active");
 
+        // 3. එබපු එක හැර අනිත් හැම section එකක්ම හංගන්න
+        kpiSection.style.display = "none";
+        fleetSection.style.display = "none";
+        vehicleSection.style.display = "none";
+
+        // 4. එබපු එකට අදාළ section එක විතරක් පෙන්නන්න
         const target = btn.dataset.target;
-        if (target === "fleet") {
+        if (target === "kpi") {
+          kpiSection.style.display = "block";
+        } else if (target === "fleet") {
           fleetSection.style.display = "block";
-          vehicleSection.style.display = "none";
-        } else {
-          fleetSection.style.display = "none";
+        } else if (target === "vehicle") {
           vehicleSection.style.display = "block";
         }
       });
@@ -339,12 +408,13 @@ function showView(key) {
 
   if (key === "maintenance") { renderMaintenanceGroup(); }
   else if (key === "licenseInsurance") { renderLicenseInsuranceGroup(); }
-  // ✅ bookings සඳහා Table එක හදන්නේ නැතුව, Calendar එක විතරක් හදන්න
-  else if (key === "bookings") { loadBookingsView(); } 
+  else if (key === "bookings" && !bookingsLoaded_) { loadBookingsView(); bookingsLoaded_ = true; }
+  else if (key === "jobcards" && !jobCardsLoaded_) { loadJobCardsView(); jobCardsLoaded_ = true; }
+  else if (key === "attendance" && !attendanceLoaded_) { loadAttendanceView(); attendanceLoaded_ = true; }
   else if (MODULES[key]) renderModule(key);
 
   if (key === "dashboard" && !dashboardLoaded_) loadDashboard();
-  if (key === "tracking") loadTracking();
+  if (key === "tracking" && !trackingLoaded_) { loadTracking(); trackingLoaded_ = true; }
 }
 
 
@@ -379,6 +449,7 @@ async function renderModule(key, targetId) {
   moduleTargets[key] = resolvedTarget;
   const root = document.getElementById(resolvedTarget);
 
+  // ✅ සාමාන්‍ය විදියටම ටැබ් එක load වෙලා තියෙනවා නම් ආයේ load කරන්නේ නැහැ
   if (root.dataset.renderedKey === key) return;
   root.dataset.renderedKey = key;
 
@@ -389,8 +460,16 @@ async function renderModule(key, targetId) {
     cardsHtml = `<div id="fuelOverview" class="fuel-overview"></div>`;
   }
 
+  const isSubModule = (resolvedTarget === "employeeContent");
+  const titleHtml = isSubModule ? "" : `
+    <div class="view-head" style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>${mod.title}</h1>
+      ${key === 'vehicles' ? `<button class="btn" id="resetVehicleFilterBtn" style="display:none; background:#00245E; color:white; padding: 6px 12px; font-size: 13px;">Show All Types</button>` : ''}
+    </div>
+  `;
+
   root.innerHTML = `
-    <div class="view-head"><h1>${mod.title}</h1></div>
+    ${titleHtml}
     ${cardsHtml}
     <div class="toolbar">
       <input type="search" placeholder="Search ${mod.title.toLowerCase()}…" id="search-${key}">
@@ -410,6 +489,19 @@ async function renderModule(key, targetId) {
   document.getElementById(`addBtn-${key}`).addEventListener("click", () => openForm(key));
   document.getElementById(`search-${key}`).addEventListener("input", (e) => paintRows(key, e.target.value));
 
+    // Reset Filter Button Logic
+  if (key === 'vehicles') {
+    const resetBtn = document.getElementById("resetVehicleFilterBtn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        currentVehicleTypeFilter_ = null;
+        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
+        resetBtn.style.display = 'none';
+        paintRows('vehicles', document.getElementById('search-vehicles').value);
+      });
+    }
+  }
+
   try {
     const rows = await Api.list(mod.sheet);
     cache[mod.sheet] = rows;
@@ -427,7 +519,25 @@ async function renderModule(key, targetId) {
 
 function paintRows(key, filterText) {
   const mod = MODULES[key];
-  const rows = (cache[mod.sheet] || []).filter((r) =>
+  let rows = cache[mod.sheet] || [];
+
+  // ✅ Drivers සහ Mechanics වෙන් කරන්න
+  if (key === 'drivers') {
+    rows = rows.filter(v => String(v.Department || "").trim() === "Transport");
+  } else if (key === 'mechanics') {
+    rows = rows.filter(v => String(v.Department || "").trim() === "Automobile");
+  }
+
+  // ✅ Vehicle Type Filter එක යොදන්න
+  if (key === 'vehicles' && currentVehicleTypeFilter_) {
+    rows = rows.filter(v => {
+      const type = String(v.Type || "").toLowerCase().trim();
+      return currentVehicleTypeFilter_.types.some(t => type.includes(t));
+    });
+  }
+
+  // ✅ Search Box එකේ Filter එක යොදන්න
+  rows = rows.filter((r) =>
     JSON.stringify(r).toLowerCase().includes(filterText.toLowerCase())
   );
   const tbody = document.getElementById(`tbody-${key}`);
@@ -454,6 +564,29 @@ function paintRows(key, filterText) {
       </tr>`
     )
     .join("");
+
+      // ✅ Highlight කරන්න ඕන Row එක තියෙනවද බලන්න
+  if (pendingHighlightVehicle_ && (key === "License" || key === "Insurance")) {
+    const modData = MODULES[key];
+    const record = (cache[modData.sheet] || []).find(r => String(r.VehicleID) === String(pendingHighlightVehicle_));
+    
+    if (record) {
+      const rowId = record[modData.idField];
+      const tr = tbody.querySelector(`tr[data-id="${rowId}"]`);
+      
+      if (tr) {
+        tr.classList.add("row-highlight-animation"); // Animation Class එක දාන්න
+        // ඒ පේළියට Scroll කරන්න
+        setTimeout(() => {
+          tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+        
+        // තත්පර 3කට පස්සේ Animation එක අයින් කරන්න
+        setTimeout(() => tr.classList.remove("row-highlight-animation"), 3000);
+      }
+    }
+    pendingHighlightVehicle_ = null; // වැඩේ ඉවරයි, Variable එක Reset කරන්න
+  }
 }
 
 function renderSingleRow(key, row) {
@@ -498,6 +631,11 @@ async function openForm(key, existing) {
   const singularName = mod.singular || mod.title.slice(0, -1);
   modalTitle.textContent = existing ? `Edit ${singularName}` : `Add ${singularName}`;
 
+    // ✅ Drivers/Mechanics Form එකට Department එක ඉබේම දාන්න
+  if (mod.defaultDept) {
+    modalForm.dataset.defaultDept = mod.defaultDept;
+  }
+
   // ✅ Booking Form එකට Driver Dropdown එක හදන්න
   if (key === "bookings") {
     try {
@@ -507,8 +645,8 @@ async function openForm(key, existing) {
       
       const driverField = mod.fields.find(f => f.key === "Driver Name");
       if (driverField) {
-        driverField.type = "select"; // text වෙනුවට select කරන්න
-        driverField.options = ["", ...driverNames]; // මුලින්ම හිස් එකක්, ඊට පස්සේ නම්
+        driverField.type = "select";
+        driverField.options = ["", ...driverNames];
       }
     } catch (err) {
       console.warn("Drivers load failed", err);
@@ -519,7 +657,18 @@ async function openForm(key, existing) {
     mod.fields
       .filter((f) => !f.auto)
       .map((f) => {
+        // JobCard අලුතෙන් දාද්දී Assigned To හංගන්න
+        if (key === "jobcards" && f.key === "Assigned To" && !existing) return "";
+        
+        // JobCard අලුතෙන් දාද්දී Requested By එකට ලොග් වෙච්ච නම දාන්න
+        if (key === "jobcards" && f.key === "Requested By" && !existing) {
+          return `<label class="field"><span>${f.label}</span>
+            <input name="${f.key}" value="${currentUser.username}" readonly style="background:#f0f0f0; cursor:not-allowed;">
+          </label>`;
+        }
+
         const val = existing ? existing[f.key] ?? "" : "";
+        
         if (f.type === "select") {
           return `<label class="field"><span>${f.label}</span>
             <select name="${f.key}">${f.options.map((o) => `<option ${o === val ? "selected" : ""}>${o}</option>`).join("")}</select>
@@ -546,6 +695,7 @@ async function openForm(key, existing) {
   if (existing) modalForm.dataset.id = existing[mod.idField];
   else delete modalForm.dataset.id;
 
+  // Auto-computed fields (LicenseExpiry / InsuranceExpiry) සඳහා
   const computedField = mod.fields.find((f) => f.computedFrom);
   if (computedField) {
     const sourceInput = modalForm.querySelector(`[name="${computedField.computedFrom}"]`);
@@ -574,6 +724,37 @@ async function openForm(key, existing) {
       sourceInput.addEventListener("change", updateDaysLeft_);
       sourceInput.addEventListener("input", updateDaysLeft_);
       updateDaysLeft_();
+    }
+  }
+
+  // ✅ License සහ Insurance සඳහා From Date දැම්මම To Date auto-fill වීම
+  if (key === "License" || key === "Insurance") {
+    const fromInput = modalForm.querySelector(`[name="FromDate"]`);
+    const toInput = modalForm.querySelector(`[name="ToDate"]`);
+
+    if (fromInput && toInput) {
+      fromInput.addEventListener("change", () => {
+        if (!fromInput.value) return;
+
+        // From Date එකට අවුරුද්දක් එකතු කරන්න
+        const fromDate = new Date(fromInput.value);
+        fromDate.setFullYear(fromDate.getFullYear() + 1);
+        
+        // අවුරුද්දක් වලංගු වෙන්න නම් දවසක් අඩු කරන්න ඕන (උදා: 2026-11-03 සිට 2027-11-02 දක්වා)
+        fromDate.setDate(fromDate.getDate() - 1);
+
+        // YYYY-MM-DD ලෙස format කරන්න
+        const y = fromDate.getFullYear();
+        const m = String(fromDate.getMonth() + 1).padStart(2, '0');
+        const d = String(fromDate.getDate()).padStart(2, '0');
+        
+        // To Date එකට අගය දෙන්න
+        toInput.value = `${y}-${m}-${d}`;
+
+        // To Date එක වෙනස් උනා කියලා දැනුම් දෙන්න (එතකොට Expiry Days එක ඉබේම ගණනය වෙයි)
+        toInput.dispatchEvent(new Event("change"));
+        toInput.dispatchEvent(new Event("input"));
+      });
     }
   }
 
@@ -655,6 +836,16 @@ modalForm?.addEventListener("submit", async (e) => {
     if (data[key] === "") delete data[key];
   });
 
+    // ✅ Department එක Auto-fill කරන්න
+  if (modalForm.dataset.defaultDept) {
+    data["Department"] = modalForm.dataset.defaultDept;
+  }
+
+  // ✅ Status එක Auto-fill කරන්න (අලුතෙන් දාද්දී Active වෙන්න)
+  if (activeModuleKey === "drivers" || activeModuleKey === "mechanics") {
+    if (!data["Status"]) data["Status"] = "Active";
+  }
+
   try {
     let response = null;
     const isUpdate = !!modalForm.dataset.id;
@@ -669,12 +860,52 @@ modalForm?.addEventListener("submit", async (e) => {
         data["Status"] = "Pending";
         data["Approved By"] = "";
       }
+      if (activeModuleKey === "jobcards") {
+        data["Status"] = "Pending"; // අලුත් ජොබ් හැම වෙලාවෙම Pending වලින් පටන් ගන්න
+      }
 
       response = await Api.add(mod.sheet, data, username);
       data[mod.idField] = response.id;
 
       const tz = "Asia/Colombo";
       const now = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace("T", " ").slice(0, 19);
+      if (mod.fields.some((f) => f.key === "Enterd Date & Time")) data["Enterd Date & Time"] = now;
+      if (mod.fields.some((f) => f.key === "Entered By")) data["Entered By"] = username;
+      if (mod.fields.some((f) => f.key === "Last Edit Date")) data["Last Edit Date"] = "";
+
+      // ✅ අලුතෙන් Vehicle එකක් දැම්මම License & Insurance වලට Auto Row දාන්න
+      if (activeModuleKey === "vehicles") {
+        const newVehicleNo = data["Vehicle No"];
+        if (newVehicleNo) {
+          try {
+            // 1. License Table එකට අලුත් Row එකක්
+            await Api.add("License", { 
+              VehicleID: newVehicleNo, 
+              "Enterd Date & Time": now, 
+              "Entered By": username 
+            }, username);
+
+            // 2. Insurance Table එකට අලුත් Row එකක්
+            await Api.add("Insurance", { 
+              VehicleID: newVehicleNo, 
+              "Enterd Date & Time": now, 
+              "Entered By": username 
+            }, username);
+
+            // ✅ Cache එක සහ පැරණි UI එක අලුත් කරන්න
+            delete cache["License"];
+            delete cache["Insurance"];
+            
+            const licContent = document.getElementById("licenseInsuranceContent");
+            if (licContent) licContent.dataset.renderedKey = ""; 
+            
+          } catch (err) {
+            // ✅ හරියටම මොකද වුනේ කියලා බලන්න
+            console.error("Auto-create API Error:", err);
+            alert("⚠️ Vehicle saved, but License/Insurance creation failed!\n\nReason: " + err.message);
+          }
+        }
+      }
       if (mod.fields.some((f) => f.key === "Enterd Date & Time")) data["Enterd Date & Time"] = now;
       if (mod.fields.some((f) => f.key === "Entered By")) data["Entered By"] = username;
       if (mod.fields.some((f) => f.key === "Last Edit Date")) data["Last Edit Date"] = "";
@@ -690,13 +921,18 @@ modalForm?.addEventListener("submit", async (e) => {
       showModalSavedToast_();
     }
 
-        // ----- ඉතිරි Cache / DOM Update Logic එක -----
+    // ----- ඉතිරි Cache / DOM Update Logic එක -----
     const key = activeModuleKey;
 
-    // ✅ අලුත් වෙනස්කම: Booking නම් Table එකට දත්ත දාන්නේ නැතුව Calendar එක Refresh කරන්න
+    // ✅ Booking නම් Table එකට දත්ත දාන්නේ නැතුව Calendar එක Refresh කරන්න
     if (key === "bookings") {
-      loadBookingsView(); // Calendar එක අලුත් කරනවා
-    } else {
+      loadBookingsView(); 
+    } 
+    // ✅ JobCards නම් Kanban Board එක Refresh කරන්න
+    else if (key === "jobcards") {
+      loadJobCardsView();
+    } 
+    else {
       // අනිත් සාමාන්‍ය Tabs වලට (Vehicles, Fuel, etc.) දත්ත දාන්නේ මෙතනින්
       const searchInput = document.getElementById(`search-${key}`);
       const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
@@ -725,6 +961,7 @@ modalForm?.addEventListener("submit", async (e) => {
     // අනිත් Charts ටික අලුත් කරන්න
     if (key === "vehicles") renderVehicleStatsCards();
     if (key === "fuel") renderFuelOverview();
+    if (key === "jobcards") loadJobCardsView();
   } catch (err) {
     submitBtn.disabled = false;
     submitBtn.textContent = originalText;
@@ -860,11 +1097,11 @@ function renderVehicleStatsCards() {
   const vehicles = cache.Vehicles || [];
 
   const categories = [
-    { key: "Bikes", types: ["bike"], label: "Motor Bikes" },
-    { key: "Luxury Vehicles", types: ["car", "jeep", "cab", "suv"], label: "Light Vehicles" },
+    { key: "Bikes", types: ["cycle"], label: "Motor Bikes" },
+    { key: "Luxury Vehicles", types: ["car", "jeep", "cab", "suv", "three"], label: "Light Vehicles" },
     { key: "Vans & Bus", types: ["van", "bus"], label: "Vans & Buses (transport)" },
     { key: "Lorry", types: ["lorry", "truck"], label: "Freezer Trucks & Lorries" },
-    { key: "Land Vehicles", types: ["tractor", "excavator", "jcb", "backhoe"], label: "Land Vehicles" },
+    { key: "Land Vehicles", types: ["tractor", "excavator", "jcb", "backhoe", "machine"], label: "Land Vehicles" },
   ];
 
   let html = `<div class="stats-row">`;
@@ -884,7 +1121,9 @@ function renderVehicleStatsCards() {
     const inactiveCount = filtered.filter((v) => (v.Status || "").trim() === "Inactive").length;
 
     html += `
-      <div class="stat-card accent-${cat.key.toLowerCase().replace(/[^a-z]/g, "")}">
+      <div class="stat-card accent-${cat.key.toLowerCase().replace(/[^a-z]/g, "")}" 
+           onclick="filterVehiclesByType('${cat.key}', ${JSON.stringify(cat.types).replace(/"/g, '&quot;')})" 
+           style="cursor: pointer;">
         <div class="stat-icon">${getVehicleTypeIcon(cat.key)}</div>
         <div class="stat-content">
           <div class="stat-title">${cat.label}</div>
@@ -2079,7 +2318,8 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
       const daysLeft = Math.round((toDate - today) / 86400000);
       return { ...r, daysLeft };
     })
-    .filter((r) => r.daysLeft >= 0 && r.daysLeft <= 30)
+    // ✅ දැන් අපි දින 30 ට අඩු සහ Minus (-) වුනු (Expired වුනු) ඒවා ඔක්කොම ගන්නවා
+    .filter((r) => r.daysLeft <= 30) 
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
   const container = document.getElementById(containerId);
@@ -2092,19 +2332,34 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
     return;
   }
 
+  // 🔹 License ද Insurance ද කියලා අඳුරගන්නවා
+  const type = containerId.includes("license") ? "License" : "Insurance";
+
   const html = withDaysLeft.map((r) => {
       const v = vehicles.find((veh) => veh["Vehicle No"] === r.VehicleID) || {};
       
-      // අවසන් වෙන දින ගණන අනුව පාට තීරණය කිරීම (දවස් 30ට)
       let badgeClass = "safe";
       let icon = "🟢";
-      if (r.daysLeft <= 7) { badgeClass = "urgent"; icon = "🔴"; }       // සතියකට අඩු
-      else if (r.daysLeft <= 14) { badgeClass = "warning"; icon = "🟡"; } // සති 2කට අඩු
+      let daysText = `${r.daysLeft} Days`;
 
+      // ✅ Minus දින සඳහා වෙනම පාටක් දෙන්න
+      if (r.daysLeft < 0) {
+        badgeClass = "expired";
+        icon = "⛔";
+        daysText = `Expired ${Math.abs(r.daysLeft)}d ago`;
+      } else if (r.daysLeft <= 7) {
+        badgeClass = "urgent";
+        icon = "🔴";
+      } else if (r.daysLeft <= 14) {
+        badgeClass = "warning";
+        icon = "🟡";
+      }
+
+      // ✅ Click කළාම අදාළ ටැබ් එකට යන්න Function එක call කරන්න
       return `
-      <div class="expiring-row">
+      <div class="expiring-row" onclick="navigateToExpiringItem('${type}', '${r.VehicleID}')" style="cursor: pointer;" title="Click to view ${type}">
         <div class="exp-left">
-          <div class="exp-icon">🚗</div>
+          <div class="exp-icon">${r.daysLeft < 0 ? '⚠️' : '🚗'}</div>
           <div>
             <div class="exp-vno">${r.VehicleID || "Unknown"}</div>
             <div class="exp-sub">${v.Department || "No Dept"} • ${v.User || "No User"}</div>
@@ -2112,7 +2367,7 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
         </div>
         <div class="exp-right">
           <div class="exp-date">${r.ToDate || ""}</div>
-          <div class="exp-badge ${badgeClass}">${icon} ${r.daysLeft} Days</div>
+          <div class="exp-badge ${badgeClass}">${icon} ${daysText}</div>
         </div>
       </div>`;
     }).join("");
@@ -2877,7 +3132,7 @@ async function loadBookingsView() {
         center: 'title',
         right: 'dayGridMonth,timeGridWeek'
       },
-      height: '100%',
+      height: 'auto', // ⬅️ මෙතන '100%' වෙනුවට 'auto' දාන්න
       events: [],
       dateClick: function(info) {
         loadBookingsForDate(info.dateStr);
@@ -3272,3 +3527,853 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+function filterVehiclesByType(categoryKey, typesArray) {
+  // ආයේ ඒ කාඩ්පතම click කළොත් filter එක අයින් වෙන්න
+  if (currentVehicleTypeFilter_ && currentVehicleTypeFilter_.key === categoryKey) {
+    currentVehicleTypeFilter_ = null;
+  } else {
+    currentVehicleTypeFilter_ = { key: categoryKey, types: typesArray };
+  }
+
+  // කාඩ්පත් වල පාට වෙනස් කිරීම (Active/Inactive)
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
+  const resetBtn = document.getElementById("resetVehicleFilterBtn");
+
+  if (currentVehicleTypeFilter_) {
+    // අදාළ කාඩ්පත highlight කරන්න
+    const activeCard = document.querySelector(`.stat-card.accent-${categoryKey.toLowerCase().replace(/[^a-z]/g, '')}`);
+    if (activeCard) activeCard.classList.add('active-filter');
+    if (resetBtn) resetBtn.style.display = 'block';
+  } else {
+    if (resetBtn) resetBtn.style.display = 'none';
+  }
+
+  // Table එක අලුත් කරන්න
+  const searchInput = document.getElementById('search-vehicles');
+  paintRows('vehicles', searchInput ? searchInput.value : "");
+}
+
+// ===================================================================
+// 23. WORKSHOP JOBS (KANBAN BOARD)
+// ===================================================================
+async function loadJobCardsView() {
+  const board = document.getElementById("kanbanBoard");
+  if (!board) return;
+  
+  board.innerHTML = `<div class="hint" style="padding:20px;">Loading Jobs...</div>`;
+
+  try {
+    const jobs = await Api.list("JobCards");
+    cache.JobCards = jobs;
+
+    // Group by Status
+    const pending = jobs.filter(j => !j.Status || j.Status === "Pending");
+    const inProgress = jobs.filter(j => j.Status === "In Progress");
+    const completed = jobs.filter(j => j.Status === "Completed");
+
+    board.innerHTML = `
+      ${renderKanbanColumn_("Pending", "pending", pending)}
+      ${renderKanbanColumn_("In Progress", "progress", inProgress)}
+      ${renderKanbanColumn_("Completed", "completed", completed)}
+    `;
+  } catch (err) {
+    board.innerHTML = `<div class="hint" style="padding:20px; color:red;">Failed to load jobs: ${err.message}</div>`;
+  }
+}
+
+function renderKanbanColumn_(title, type, items) {
+  const cardsHtml = items.map(job => {
+    const priorityClass = job.Priority === "High" ? "priority-high" : (job.Priority === "Low" ? "priority-low" : "priority-medium");
+    const jobNo = String(job.ID).startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
+
+    let actions = "";
+    if (type === "pending") {
+      actions = `
+        <button class="btn-edit-job" onclick='openForm("jobcards", ${JSON.stringify(job).replace(/'/g, "&apos;")})'>✎ Edit</button>
+        <button class="btn-start" onclick="moveJobStatus('${job.ID}', 'In Progress')">▶ Start</button>
+      `;
+    } else if (type === "progress") {
+      // In Progress: Print, Edit, Complete
+      actions = `
+        <button class="btn-edit-job" onclick='openForm("jobcards", ${JSON.stringify(job).replace(/'/g, "&apos;")})'>✎ Edit</button>
+        <button class="btn-complete" onclick="moveJobStatus('${job.ID}', 'Completed')">✔ Complete</button>
+      `;
+    } else {
+      // Completed: Duration එක පෙන්නන්න
+      let durationText = "Done";
+      if (job["Start Date"] && job["Complete Date"]) {
+        const start = new Date(job["Start Date"].replace(" ", "T"));
+        const end = new Date(job["Complete Date"].replace(" ", "T"));
+        const diffMs = end - start;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        if (diffDays > 0) {
+          durationText = `⏱ ${diffDays}d ${diffHrs}h`;
+        } else {
+          durationText = `⏱ ${diffHrs}h`;
+        }
+      }
+      actions = `<button class="btn-edit-job" disabled style="flex:1; background:#e0e7ff; color:#3730a3;">${durationText}</button>`;
+    }
+
+    return `
+      <div class="job-card ${priorityClass}">
+        <div class="job-card-head">
+          <span class="job-card-vno">🚗 ${job["Vehicle No"]}</span>
+          <span class="job-card-type">${jobNo}</span>
+        </div>
+        
+        <div class="job-card-details">
+          <div class="detail-row"><span>Req:</span> ${job["Requested By"]}</div>
+          <div class="detail-row"><span>Req. date:</span> ${job["Date"] || ""}</div>
+          <div class="detail-row"><span>Job type:</span> ${job["Job Type"] || "Other"}</div>
+          <div class="detail-row"><span>Description:</span> ${job.Description || "No description"}</div>
+          <div class="detail-row"><span>Priority:</span> ${job.Priority || "Medium"}</div>
+          ${job["Remarks"] ? `<div class="detail-row"><span>Remark:</span> ${job["Remarks"]}</div>` : ""}
+          ${job["Other Details"] ? `<div class="detail-row"><span>Other:</span> ${job["Other Details"]}</div>` : ""}
+          
+          <!-- ✅ In Progress සහ Completed වලට විතරක් Mechanic සහ Start Date පෙන්නන්න -->
+          ${(type === "progress" || type === "completed") && job["Assigned To"] ? 
+            `<div class="detail-row" style="margin-top:4px; border-top:1px dashed #eee; padding-top:4px;">
+               <span>Mechanic:</span> <b>${job["Assigned To"]}</b>
+             </div>` : ""}
+          ${(type === "progress" || type === "completed") && job["Start Date"] ? 
+            `<div class="detail-row">
+               <span>Started:</span> ${job["Start Date"]}
+             </div>` : ""}
+
+          <!-- ✅ අලුතෙන් එකතු කළ Ended Date සහ Duration Section එක -->
+          ${type === "completed" && job["Complete Date"] ? `
+            <div class="detail-row">
+              <span>Ended:</span> ${job["Complete Date"]}
+            </div>
+            <div class="detail-row" style="margin-top:2px;">
+              <span>Duration:</span> 
+              <b style="color:#b45309;">⏱️ ${calculateJobDuration_(job["Start Date"], job["Complete Date"])}</b>
+            </div>
+          ` : ""}
+
+          <!-- ✅ අලුතෙන් එකතු කළ Feedback Section එක -->
+          ${type === "completed" && job["Feedback"] ? `
+            <div class="detail-row feedback-row" style="margin-top:4px; border-top:1px dashed #eee; padding-top:4px;">
+              <span>Feedback:</span> 
+              <span class="feedback-text">⭐ ${job["Feedback"]}</span>
+            </div>
+          ` : ""}
+        </div>
+
+        <div class="job-card-footer">
+          <div class="job-card-actions">
+            ${actions}
+          </div>
+          <button class="btn-print-job" onclick='printJobCard(${JSON.stringify(job).replace(/'/g, "&apos;")})' title="Print Job Card">🖨️</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="kanban-col">
+      <div class="kanban-col-head ${type}">
+        ${title}
+        <span class="badge">${items.length}</span>
+      </div>
+      <div class="kanban-cards-wrap">
+        ${cardsHtml || `<div class="hint" style="text-align:center; margin-top:20px;">No jobs here.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+async function moveJobStatus(id, newStatus) {
+  if (newStatus === "Completed") {
+    // Complete කරද්දී Modal එක open කරන්න
+    openCompleteJobModal(id);
+    return;
+  }
+
+  try {
+    const payload = { ID: id, Status: newStatus };
+    
+    if (newStatus === "In Progress") {
+      const tz = "Asia/Colombo";
+      const now = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace("T", " ").slice(0, 16); 
+      payload["Start Date"] = now;
+    }
+
+    await Api.update("JobCards", payload, currentUser.username);
+    loadJobCardsView(); 
+  } catch (err) {
+    alert("Failed to update status: " + err.message);
+  }
+}
+
+// ✅ අලුත් Functions
+function openCompleteJobModal(id) {
+  const job = cache.JobCards.find(j => String(j.ID) === String(id));
+  if (!job) return;
+  
+  document.getElementById("completeJobNo").textContent = job.ID;
+  document.getElementById("completeJobCost").value = "";
+  document.getElementById("completeJobRemarks").value = "";
+  document.getElementById("completeJobFeedback").value = "";
+  document.getElementById("completeJobModal").classList.add("open");
+  
+  // Save button එකට current ID එක දාන්න
+  document.getElementById("submitCompleteJobBtn").onclick = () => submitJobCompletion(id);
+}
+
+async function submitJobCompletion(id) {
+  const cost = document.getElementById("completeJobCost").value;
+  const remarks = document.getElementById("completeJobRemarks").value;
+  const feedback = document.getElementById("completeJobFeedback").value;
+
+  try {
+    const tz = "Asia/Colombo";
+    const now = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace("T", " ").slice(0, 16); 
+
+    const payload = { 
+      ID: id, 
+      Status: "Completed",
+      "Complete Date": now,
+      "Final Cost": cost,
+      "Remarks": remarks,
+      "Feedback": feedback
+    };
+
+    await Api.update("JobCards", payload, currentUser.username);
+    document.getElementById("completeJobModal").classList.remove("open");
+    loadJobCardsView(); 
+  } catch (err) {
+    alert("Failed to complete job: " + err.message);
+  }
+}
+
+function printJobCard(job) {
+  const jobNo = String(job.ID).startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
+  const printWindow = window.open('', '_blank');
+  
+  printContent = `
+    <html>
+    <head>
+      <title>Job Card - ${jobNo}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #00245E; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { margin: 0; color: #00245E; font-size: 24px; }
+        .header p { margin: 5px 0 0; font-size: 14px; color: #666; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
+        .info-item { font-size: 14px; }
+        .info-item b { display: inline-block; width: 120px; color: #555; }
+        .desc-box { border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 100px; }
+        .desc-box h3 { margin: 0 0 10px 0; font-size: 14px; color: #00245E; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
+        .sig-line { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 5px; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Imo Chicken & Agro (Pvt) Ltd</h1>
+        <p>Automobile Department - Job Card</p>
+      </div>
+      
+      <div class="info-grid">
+        <div class="info-item"><b>Job No:</b> ${jobNo}</div>
+        <div class="info-item"><b>Date:</b> ${job.Date || ""}</div>
+        <div class="info-item"><b>Vehicle No:</b> ${job["Vehicle No"]}</div>
+        <div class="info-item"><b>Job Type:</b> ${job["Job Type"] || ""}</div>
+        <div class="info-item"><b>Requested By:</b> ${job["Requested By"]}</div>
+        <div class="info-item"><b>Assigned To:</b> ${job["Assigned To"] || "Not Assigned"}</div>
+        <div class="info-item"><b>Priority:</b> ${job.Priority || ""}</div>
+      </div>
+
+      <div class="desc-box">
+        <h3>Description / Issue</h3>
+        <p>${job.Description || "No description provided."}</p>
+      </div>
+      
+      ${job["Other Details"] ? `
+      <div class="desc-box" style="margin-top: 15px;">
+        <h3>Other Repairs / Issues</h3>
+        <p>${job["Other Details"]}</p>
+      </div>` : ""}
+
+      ${job["Remarks"] ? `
+      <div class="desc-box" style="margin-top: 15px;">
+        <h3>Remarks</h3>
+        <p>${job["Remarks"]}</p>
+      </div>` : ""}
+
+      <!-- ✅ අලුතෙන් එකතු කළ Feedback Print Section එක -->
+      ${job["Feedback"] ? `
+      <div class="desc-box" style="margin-top: 15px; border-color: #fbbf24; background-color: #fffbeb;">
+        <h3 style="color: #d97706;">Mechanic Feedback</h3>
+        <p>⭐ ${job["Feedback"]}</p>
+      </div>` : ""}
+
+      <div class="signatures">
+        <div class="sig-line">Transport Officer</div>
+        <div class="sig-line">Automobile Head</div>
+        <div class="sig-line">Mechanic</div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 500);
+}
+
+// ===================================================================
+// 24. COMPLETED JOBS REPORT (Date Range)
+// ===================================================================
+function printCompletedJobsReport() {
+  const fromDate = document.getElementById("jobReportFrom").value;
+  const toDate = document.getElementById("jobReportTo").value;
+
+  if (!fromDate || !toDate) {
+    alert("Please select both From and To dates.");
+    return;
+  }
+
+  // Filter Completed Jobs based on Complete Date
+  const jobs = (cache.JobCards || []).filter(job => {
+    if (job.Status !== "Completed") return false;
+    
+    // Complete Date එක YYYY-MM-DD ලෙස ගන්නවා
+    const cDate = job["Complete Date"] ? String(job["Complete Date"]).split(" ")[0] : "";
+    if (!cDate) return false;
+
+    return cDate >= fromDate && cDate <= toDate;
+  });
+
+  if (jobs.length === 0) {
+    alert("No completed jobs found for the selected date range.");
+    return;
+  }
+
+  // Build HTML Table Rows
+  const tableRows = jobs.map(job => {
+    const jobNo = String(job.ID).startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
+    
+    // Format Dates
+    const reqDate = job["Date"] || "-";
+    const compDate = job["Complete Date"] || "-";
+    
+    // Cost
+    const cost = job["Final Cost"] ? "Rs. " + Number(job["Final Cost"]).toLocaleString() : "-";
+
+    return `
+      <tr>
+        <td>${jobNo}</td>
+        <td>${job["Vehicle No"]}</td>
+        <td>${job["Job Type"] || "-"}</td>
+        <td>${job["Requested By"] || "-"}</td>
+        <td>${job["Assigned To"] || "-"}</td>
+        <td>${reqDate}</td>
+        <td>${compDate}</td>
+        <td>${cost}</td>
+        <td>${job["Feedback"] || "-"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // Total Cost Calculation
+  const totalCost = jobs.reduce((sum, job) => sum + (Number(job["Final Cost"]) || 0), 0);
+
+  // Print Window Content
+  const printContent = `
+    <html>
+    <head>
+      <title>Completed Jobs Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #00245E; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { margin: 0; color: #00245E; font-size: 20px; }
+        .header p { margin: 5px 0 0; font-size: 12px; color: #666; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        th { background-color: #00245E; color: white; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .total-row td { font-weight: bold; background-color: #fffbeb; color: #b45309; }
+        .footer { text-align: right; font-size: 10px; color: #888; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Imo Chicken & Agro (Pvt) Ltd</h1>
+        <p>Completed Workshop Jobs Report (${fromDate} to ${toDate})</p>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>Job No</th>
+            <th>Vehicle No</th>
+            <th>Job Type</th>
+            <th>Requested By</th>
+            <th>Mechanic</th>
+            <th>Req. Date</th>
+            <th>Completed Date</th>
+            <th>Cost (Rs.)</th>
+            <th>Feedback</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          <tr class="total-row">
+            <td colspan="7" style="text-align: right;">Total Jobs: ${jobs.length} | Total Cost:</td>
+            <td colspan="2">Rs. ${totalCost.toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="footer">
+        Generated on: ${new Date().toLocaleString()}
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Open Print Window
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 500);
+}
+
+// ===================================================================
+// 25. ATTENDANCE QUICK MARKING
+// ===================================================================
+async function loadAttendanceView() {
+  const grid = document.getElementById("attendanceGrid");
+  const datePicker = document.getElementById("attendanceDate");
+  
+  if (!grid || !datePicker) return;
+
+  // Set current date
+  datePicker.value = attendanceDate_;
+
+  // Date change event
+  datePicker.addEventListener("change", (e) => {
+    attendanceDate_ = e.target.value;
+    renderAttendanceGrid();
+  });
+
+  // Sub-tab logic
+  const tabBtns = document.querySelectorAll("#attendanceDeptTabs .dash-tab-btn");
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      attendanceDept_ = btn.dataset.dept;
+      
+      // ✅ රිපෝට් එකේ මාතෘකාව වෙනස් කරන්න
+      const reportTitle = document.getElementById("attReportTitle");
+      if (reportTitle) {
+        reportTitle.textContent = `📊 ${attendanceDept_} Dept Report:`;
+      }
+
+      renderAttendanceGrid();
+    });
+  });
+
+  grid.innerHTML = `<div class="hint">Loading attendance data...</div>`;
+
+  try {
+    // Data load (Drivers & Attendance)
+    const [drivers, attendance] = await Promise.all([
+      cache.Drivers || Api.list("Drivers"),
+      Api.list("Attendance")
+    ]);
+    
+    cache.Drivers = drivers;
+    cache.Attendance = attendance;
+
+    renderAttendanceGrid();
+
+  } catch (err) {
+    grid.innerHTML = `<div class="hint" style="color:red;">Failed to load attendance: ${err.message}</div>`;
+  }
+}
+
+function renderAttendanceGrid() {
+  const grid = document.getElementById("attendanceGrid");
+  if (!grid) return;
+
+  // Filter Employees by Department and Active Status
+  let employees = (cache.Drivers || []).filter(d => {
+    const dept = String(d.Department || "").trim();
+    const status = String(d.Status || "Active").trim(); // Status එකක් නැත්නම් Active කියලා හිතන්න
+    return dept === attendanceDept_ && status === "Active"; 
+  });
+
+  // Filter attendance for the selected date
+  const todaysAtt = (cache.Attendance || []).filter(a => 
+    String(a.Date) === attendanceDate_ && a.Department === attendanceDept_
+  );
+
+  if (!employees.length) {
+    grid.innerHTML = `<div class="hint" style="text-align:center; margin-top:20px;">No employees found in ${attendanceDept_} Department.<br><small>Please add employees in Driver Master with Department set to "${attendanceDept_}"</small></div>`;
+    return;
+  }
+
+  grid.innerHTML = employees.map(emp => {
+    const empName = emp.Name;
+    // Check if attendance exists
+    const record = todaysAtt.find(a => String(a["Employee Name"]) === String(empName));
+    
+    const status = record ? record.Status : "";
+    const inTime = record ? (record["In Time"] || "") : "";
+    const outTime = record ? (record["Out Time"] || "") : "";
+    const recId = record ? record.ID : "";
+
+    const statuses = ["Present", "Absent", "Half Day", "Leave"];
+
+    return `
+      <div class="att-card" data-name="${empName}" data-id="${recId}">
+        <div class="att-header">
+          <span class="att-emp-name">👤 ${empName}</span>
+          <span class="att-emp-dept">${emp.Department || "N/A"}</span>
+        </div>
+        
+        <div class="att-buttons">
+          ${statuses.map(s => `
+            <button class="att-btn ${status === s ? 'active' : ''}" 
+                    data-status="${s}" 
+                    onclick="markAttendance(this, '${empName}', '${s}')">
+              ${s}
+            </button>
+          `).join("")}
+        </div>
+
+        <div class="att-times">
+          <label>In Time
+            <input type="time" value="${inTime}" onchange="updateAttTime(this, '${empName}', 'In Time', this.value)">
+          </label>
+          <label>Out Time
+            <input type="time" value="${outTime}" onchange="updateAttTime(this, '${empName}', 'Out Time', this.value)">
+          </label>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function markAttendance(btn, empName, newStatus) {
+  const card = btn.closest(".att-card");
+  const recId = card.dataset.id;
+  
+  // UI Update instantly (Optimistic UI)
+  card.querySelectorAll(".att-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  try {
+    if (recId) {
+      // Update existing record
+      const payload = {
+        ID: recId,
+        Status: newStatus
+      };
+      await Api.update("Attendance", payload, currentUser.username);
+      
+      // Update cache
+      const idx = cache.Attendance.findIndex(a => String(a.ID) === String(recId));
+      if (idx !== -1) cache.Attendance[idx].Status = newStatus;
+
+    } else {
+      // Add new record
+      const payload = {
+        Date: attendanceDate_,
+        Department: attendanceDept_,
+        "Employee Name": empName,
+        Status: newStatus,
+        "In Time": "",
+        "Out Time": ""
+      };
+      
+      const res = await Api.add("Attendance", payload, currentUser.username);
+      
+      // Update cache and UI ID
+      payload.ID = res.id;
+      cache.Attendance.push(payload);
+      card.dataset.id = res.id;
+    }
+  } catch (err) {
+    alert("Failed to mark attendance: " + err.message);
+    // Revert UI if failed (simple reload)
+    renderAttendanceGrid();
+  }
+}
+
+async function updateAttTime(input, empName, field, value) {
+  const card = input.closest(".att-card");
+  const recId = card.dataset.id;
+  
+  if (!recId) {
+    alert("Please mark attendance status first before adding time.");
+    input.value = "";
+    return;
+  }
+
+  try {
+    const payload = {
+      ID: recId,
+      [field]: value
+    };
+    await Api.update("Attendance", payload, currentUser.username);
+    
+    // Update cache
+    const idx = cache.Attendance.findIndex(a => String(a.ID) === String(recId));
+    if (idx !== -1) cache.Attendance[idx][field] = value;
+
+  } catch (err) {
+    alert("Failed to update time: " + err.message);
+  }
+}
+
+// ===================================================================
+// EMPLOYEES (Drivers & Mechanics) SUBTABS
+// ===================================================================
+function renderEmployeesGroup() {
+  const subtabs = document.querySelectorAll("#employeeSubtabs .subtab-btn");
+  
+  subtabs.forEach((btn) => {
+    btn.onclick = () => {
+      subtabs.forEach((b) => b.classList.toggle("active", b === btn));
+      
+      // අලුත් Module key එක තීරණය කරන්න
+      const moduleKey = btn.dataset.submodule === "drivers" ? "drivers" : "mechanics";
+      
+      // ✅ උඩ තියෙන මාතෘකාව වෙනස් කරන්න
+      const mainTitle = document.querySelector("#view-employees .view-head h1");
+      if (mainTitle) {
+        mainTitle.textContent = moduleKey === "drivers" ? "Employee Master (Drivers)" : "Employee Master (Mechanics)";
+      }
+
+      renderModule(moduleKey, "employeeContent");
+    };
+  });
+
+  const activeBtn = document.querySelector("#employeeSubtabs .subtab-btn.active") || subtabs[0];
+  const moduleKey = activeBtn.dataset.submodule === "drivers" ? "drivers" : "mechanics";
+  
+  // ✅ පළමු වරට load වෙද්දී මාතෘකාව වෙනස් කරන්න
+  const mainTitle = document.querySelector("#view-employees .view-head h1");
+  if (mainTitle) {
+    mainTitle.textContent = moduleKey === "drivers" ? "Employee Master (Drivers)" : "Employee Master (Mechanics)";
+  }
+
+  renderModule(moduleKey, "employeeContent");
+}
+
+// ===================================================================
+// 26. ATTENDANCE REPORT (Date Range)
+// ===================================================================
+function printAttendanceReport() {
+  const fromDate = document.getElementById("attReportFrom").value;
+  const toDate = document.getElementById("attReportTo").value;
+  const dept = attendanceDept_; // දැනට active තියෙන ඩිපාර්ට්මන්ට් එක
+
+  if (!fromDate || !toDate) {
+    alert("Please select both From and To dates.");
+    return;
+  }
+
+  // 1. දත්ත Filter කරගන්න
+  const records = (cache.Attendance || []).filter(a => {
+    const d = String(a.Date);
+    return d >= fromDate && d <= toDate && a.Department === dept;
+  });
+
+  if (records.length === 0) {
+    alert(`No attendance records found for ${dept} Dept in this date range.`);
+    return;
+  }
+
+  // දිනය අනුව පිළිවෙලට හදන්න
+  records.sort((a, b) => {
+    if (a.Date !== b.Date) return String(a.Date).localeCompare(String(b.Date));
+    return String(a["Employee Name"]).localeCompare(String(b["Employee Name"]));
+  });
+
+  // 2. Table Rows හදන්න
+  const tableRows = records.map(r => {
+    let statusColor = "";
+    if (r.Status === "Present") statusColor = "color: #15803d; font-weight:bold;";
+    else if (r.Status === "Absent") statusColor = "color: #b91c1c; font-weight:bold;";
+    else if (r.Status === "Half Day") statusColor = "color: #b45309; font-weight:bold;";
+    else if (r.Status === "Leave") statusColor = "color: #1d4ed8; font-weight:bold;";
+
+    return `
+      <tr>
+        <td>${r.Date}</td>
+        <td>${r["Employee Name"]}</td>
+        <td style="${statusColor}">${r.Status || "-"}</td>
+        <td>${r["In Time"] || "-"}</td>
+        <td>${r["Out Time"] || "-"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // 3. සාරාංශය (Summary) හදන්න (කවුද කීයක් ආවේද)
+  const summary = {};
+  records.forEach(r => {
+    if (!summary[r["Employee Name"]]) {
+      summary[r["Employee Name"]] = { Present: 0, Absent: 0, "Half Day": 0, Leave: 0 };
+    }
+    if (summary[r["Employee Name"]][r.Status] !== undefined) {
+       summary[r["Employee Name"]][r.Status]++;
+    }
+  });
+
+  const summaryRows = Object.keys(summary).map(name => {
+     const s = summary[name];
+     return `
+       <tr>
+         <td>${name}</td>
+         <td style="color:#15803d; font-weight:bold;">${s.Present}</td>
+         <td style="color:#b91c1c; font-weight:bold;">${s.Absent}</td>
+         <td style="color:#b45309; font-weight:bold;">${s["Half Day"]}</td>
+         <td style="color:#1d4ed8; font-weight:bold;">${s.Leave}</td>
+       </tr>
+     `;
+  }).join("");
+
+  // 4. Print Window Content එක හදන්න
+  const printContent = `
+    <html>
+    <head>
+      <title>${dept} Attendance Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #00245E; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { margin: 0; color: #00245E; font-size: 20px; }
+        .header p { margin: 5px 0 0; font-size: 12px; color: #666; }
+        
+        h3 { font-size: 14px; color: #00245E; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 30px; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        th { background-color: #00245E; color: white; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        .footer { text-align: right; font-size: 10px; color: #888; margin-top: 20px; }
+        .page-break { page-break-before: always; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Imo Chicken & Agro (Pvt) Ltd</h1>
+        <p>${dept} Department - Attendance Report (${fromDate} to ${toDate})</p>
+      </div>
+      
+      <h3>1. Daily Attendance Log</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Employee Name</th>
+            <th>Status</th>
+            <th>In Time</th>
+            <th>Out Time</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+
+      <div class="page-break"></div>
+      
+      <h3>2. Employee Summary</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Employee Name</th>
+            <th style="background:#16a34a; color:white;">Present</th>
+            <th style="background:#dc2626; color:white;">Absent</th>
+            <th style="background:#d97706; color:white;">Half Day</th>
+            <th style="background:#2563eb; color:white;">Leave</th>
+          </tr>
+        </thead>
+        <tbody>${summaryRows}</tbody>
+      </table>
+
+      <div class="footer">
+        Generated on: ${new Date().toLocaleString()}
+      </div>
+    </body>
+    </html>
+  `;
+
+  // 5. Print කරන්න
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 500);
+}
+
+// ===================================================================
+// NAVIGATE TO EXPIRING ITEM & HIGHLIGHT
+// ===================================================================
+function navigateToExpiringItem(type, vehicleNo) {
+  // 1. License and Insurance ටැබ් එකට යන්න
+  showView("licenseInsurance");
+
+  // 2. අදාළ Sub-tab එක (License හෝ Insurance) තෝරන්න
+  const subtabs = document.querySelectorAll("#licenseInsuranceSubtabs .subtab-btn");
+  subtabs.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.submodule === type);
+  });
+
+  // 3. ඒ පේළිය Highlight කරන්න ඕන වාහනේ අංකය මතක තියාගන්න
+  pendingHighlightVehicle_ = vehicleNo;
+
+  // 4. Cache එක Clear කරලා අලුතෙන් Render කරන්න (එතකොට අලුත් දත්ත එයි)
+  delete cache[type];
+  const contentDiv = document.getElementById("licenseInsuranceContent");
+  if (contentDiv) contentDiv.dataset.renderedKey = "";
+
+  renderModule(type, "licenseInsuranceContent");
+}
+
+// ===================================================================
+// CALCULATE JOB DURATION (Days, Hours, Mins)
+// ===================================================================
+function calculateJobDuration_(startStr, endStr) {
+  if (!startStr || !endStr) return "N/A";
+
+  // "YYYY-MM-DD HH:mm" format එක Date object එකකට හරවන්න
+  const start = new Date(startStr.replace(" ", "T"));
+  const end = new Date(endStr.replace(" ", "T"));
+
+  const diffMs = end - start;
+  
+  if (diffMs < 0) return "Invalid dates";
+  if (diffMs === 0) return "0 mins";
+
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  let result = [];
+  if (diffDays > 0) result.push(`${diffDays} day${diffDays > 1 ? 's' : ''}`);
+  if (diffHrs > 0) result.push(`${diffHrs} hr${diffHrs > 1 ? 's' : ''}`);
+  if (diffMins > 0) result.push(`${diffMins} min${diffMins > 1 ? 's' : ''}`);
+
+  return result.length > 0 ? result.join(" ") : "0 mins";
+}

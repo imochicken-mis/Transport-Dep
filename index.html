@@ -40,13 +40,15 @@
 
   <div class="nav-section-label">Data Entry</div>
   <button class="nav-item" data-view="vehicles" data-tooltip="Vehicle Master"><span class="ico">🚗</span>Vehicle Master</button>
-  <button class="nav-item" data-view="drivers" data-tooltip="Driver Master"><span class="ico">👨‍✈️</span>Driver Master</button>
+  <button class="nav-item" data-view="employees" data-tooltip="Employees"><span class="ico">👨‍✈️</span>Employees</button>
   <button class="nav-item" data-view="fuel" data-tooltip="Fuel Management"><span class="ico">⛽</span>Fuel Management</button>
   <button class="nav-item" data-view="Lubricant" data-tooltip="Lubricant Management"><span class="ico">🛢️</span>Lubricant Management</button>
   <button class="nav-item" data-view="maintenance" data-tooltip="Service & Maintenance"><span class="ico">🔧</span>Service & Maintenance</button>
   <button class="nav-item" data-view="licenseInsurance" data-tooltip="License & Insurance"><span class="ico">🛡️</span>License & Insurance</button>
   <button class="nav-item" data-view="Accident" data-tooltip="Accident Recorder"><span class="ico">⚠️</span>Accident Recorder</button>
   <button class="nav-item" data-view="bookings" data-tooltip="Vehicle Booking"><span class="ico">📅</span>Vehicle Booking</button>
+  <button class="nav-item" data-view="jobcards" data-tooltip="Job Cards"><span class="ico">🛠️</span>Workshop Jobs</button>
+  <button class="nav-item" data-view="attendance" data-tooltip="Attendance"><span class="ico">⏱️</span>Attendance</button>
   </nav>
         <div class="sidebar-foot">
       <span class="dot dot-live"></span> Apps Script API
@@ -78,12 +80,68 @@
       
             <!-- Tabs (Buttons) -->
       <div class="dash-tabs">
-        <button class="dash-tab-btn active" data-target="fleet">Overall Analysis</button>
+        <button class="dash-tab-btn active" data-target="kpi">KPI Analysis</button>
+        <button class="dash-tab-btn" data-target="fleet">Overall Analysis</button>
         <button class="dash-tab-btn" data-target="vehicle">Individual Analysis</button>
       </div>
 
+      <!-- 0. KPI ANALYSIS SECTION (New) -->
+      <div id="dash-kpi-section">
+        <div class="dashboard-top-row">
+          <div class="view-head">
+            <h1>KPI Analysis</h1>
+            <p class="sub">Key Performance Indicators for the fleet.</p>
+          </div>
+        </div>
+
+        <!-- KPI Cards (මේවා පස්සේ කාලෙක අපිට දත්ත වලින් පුරවන්න පුළුවන්) -->
+        <div class="stats-row" style="margin-bottom: 24px;">
+          <div class="stat-card" style="border-top: 4px solid #3B82F6;">
+            <div class="stat-icon">-</div>
+            <div class="stat-content">
+              <div class="stat-title">KPI 01</div>
+              <div class="stat-numbers">
+                <span class="stat-total">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card" style="border-top: 4px solid #F59E0B;">
+            <div class="stat-icon">-</div>
+            <div class="stat-content">
+              <div class="stat-title">KPI 02</div>
+              <div class="stat-numbers">
+                <span class="stat-total">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card" style="border-top: 4px solid #EF4444;">
+            <div class="stat-icon">-</div>
+            <div class="stat-content">
+              <div class="stat-title">KPI 03</div>
+              <div class="stat-numbers">
+                <span class="stat-total">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card" style="border-top: 4px solid #10B981;">
+            <div class="stat-icon">-</div>
+            <div class="stat-content">
+              <div class="stat-title">KPI 04</div>
+              <div class="stat-numbers">
+                <span class="stat-total">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- මෙතනට පස්සේ කාලෙක අපි KPI Charts දාමු -->
+        <div class="panel" style="padding: 40px; text-align: center; color: var(--muted);">
+          <h2 style="font-size: 18px; margin-bottom: 10px;">📈 More KPI Charts Coming Soon!</h2>
+        </div>
+      </div>
+
       <!-- 1. FLEET OVERVIEW SECTION -->
-      <div id="dash-fleet-section">
+      <div id="dash-fleet-section" style="display: none;"> <!-- ⬅️ මේකට display: none; දාන්න -->
         <div class="dashboard-top-row">
           <div class="view-head">
             <h1>Overall Analysis</h1>
@@ -202,7 +260,20 @@
 
     <!-- GENERIC CRUD VIEWS -->
     <section class="view" id="view-vehicles"></section>
-    <section class="view" id="view-drivers"></section>
+        <!-- EMPLOYEES VIEW (Drivers & Mechanics) -->
+    <section class="view" id="view-employees">
+      <div class="view-head maintenance-head">
+        <div>
+          <h1>Employee Master</h1>
+          <p class="sub">Manage Drivers and Mechanics.</p>
+        </div>
+        <div class="subtabs" id="employeeSubtabs">
+          <button class="subtab-btn active" data-submodule="drivers">Drivers</button>
+          <button class="subtab-btn" data-submodule="mechanics">Mechanics</button>
+        </div>
+      </div>
+      <div id="employeeContent"></div>
+    </section>
     <section class="view" id="view-fuel"></section>
     <section class="view" id="view-maintenance">
   <div class="view-head maintenance-head">
@@ -273,6 +344,58 @@
         </div>
   </div>
 </section>
+
+    <!-- WORKSHOP JOB CARDS (KANBAN) -->
+    <section class="view" id="view-jobcards">
+      <div class="view-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h1>Workshop Jobs</h1>
+          <p class="sub">Manage repair and service requests between departments.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openForm('jobcards')">+ New Job Request</button>
+      </div>
+
+      <!-- ✅ අලුත් Report Filter එක -->
+      <div class="job-report-filter">
+        <span class="filter-title">📊 Completed Jobs Report:</span>
+        <label>From <input type="date" id="jobReportFrom"></label>
+        <label>To <input type="date" id="jobReportTo"></label>
+        <button class="btn btn-amber" onclick="printCompletedJobsReport()">🖨️ Print Report</button>
+      </div>
+
+      <div class="kanban-board" id="kanbanBoard">
+        <!-- Columns will be injected by JS -->
+      </div>
+    </section>
+
+        <!-- ATTENDANCE VIEW -->
+    <section class="view" id="view-attendance">
+      <div class="view-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h1>Attendance Marking</h1>
+          <p class="sub">Mark daily attendance for Transport and Automobile departments.</p>
+        </div>
+        <input type="date" id="attendanceDate" style="padding:8px 12px; border:1px solid #dbe4ff; border-radius:8px; font-size:14px; font-weight:bold; color:var(--navy);">
+      </div>
+
+      <!-- ✅ අලුත් Attendance Report Filter එක -->
+      <div class="job-report-filter" style="margin-bottom: 16px;">
+        <span class="filter-title" id="attReportTitle">📊 Transport Dept Report:</span>
+        <label>From <input type="date" id="attReportFrom"></label>
+        <label>To <input type="date" id="attReportTo"></label>
+        <button class="btn btn-amber" onclick="printAttendanceReport()">🖨️ Print Report</button>
+      </div>
+
+      <div class="dash-tabs" id="attendanceDeptTabs">
+        <button class="dash-tab-btn active" data-dept="Transport">Transport Dept</button>
+        <button class="dash-tab-btn" data-dept="Automobile">Automobile Dept</button>
+      </div>
+
+      <div id="attendanceGrid" class="attendance-grid">
+        <!-- Cards injected by JS -->
+      </div>
+    </section>
+
         <!-- SETTINGS -->
     <section class="view" id="view-settings"></section>
 
@@ -336,6 +459,36 @@
         <button class="btn btn-primary" id="downloadCsvBtn" style="flex: 1;">Download CSV</button>
         <button class="btn btn-amber" id="downloadPdfBtn" style="flex: 1;">Download PDF</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Job Completion Modal -->
+<div class="modal-backdrop" id="completeJobModal">
+  <div class="modal" style="max-width: 450px;">
+    <div class="modal-head">
+      <h3>✔ Complete Job</h3>
+      <button class="modal-close" onclick="document.getElementById('completeJobModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom: 15px;">Job No: <b id="completeJobNo" style="color:var(--navy); font-size:14px;"></b></p>
+      
+      <label class="field">
+        <span>Final Cost (Rs.)</span>
+        <input type="number" id="completeJobCost" placeholder="e.g. 15000">
+      </label>
+      
+      <label class="field" style="margin-top: 10px;">
+        <span>Final Remarks (Work Done)</span>
+        <input type="text" id="completeJobRemarks" placeholder="What was fixed?">
+      </label>
+      
+      <label class="field" style="margin-top: 10px;">
+        <span>Feedback for Mechanic</span>
+        <input type="text" id="completeJobFeedback" placeholder="Excellent, Good, Needs improvement...">
+      </label>
+
+      <button class="btn btn-primary" id="submitCompleteJobBtn" style="margin-top: 20px;" onclick="submitJobCompletion()">✔ Mark as Completed</button>
     </div>
   </div>
 </div>
