@@ -13,6 +13,18 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- ✅ Sidebar Tooltip Container -->
+  <div id="sidebar-tooltip" class="sidebar-tooltip"></div>
+
+  <!-- Column Filter Popup -->
+<div id="filterPopup" class="filter-popup" style="display: none;">
+  <div id="filterPopupContent"></div>
+  <div style="display: flex; gap: 8px; margin-top: 12px;">
+    <button class="btn btn-primary" style="flex:1; padding: 6px; font-size: 12px;" onclick="applyColumnFilter()">Apply</button>
+    <button class="btn" style="flex:1; padding: 6px; font-size: 12px; background:#eef1f7; color:#333;" onclick="clearColumnFilter()">Clear</button>
+  </div>
+</div>
+
 <script>
   // Auth guard: no session -> back to login
   if (!sessionStorage.getItem("vms_user")) {
@@ -47,6 +59,8 @@
   <button class="nav-item" data-view="licenseInsurance" data-tooltip="License & Insurance"><span class="ico">🛡️</span>License & Insurance</button>
   <button class="nav-item" data-view="Accident" data-tooltip="Accident Recorder"><span class="ico">⚠️</span>Accident Recorder</button>
   <button class="nav-item" data-view="bookings" data-tooltip="Vehicle Booking"><span class="ico">📅</span>Vehicle Booking</button>
+  <button class="nav-item" data-view="tripInfo" data-tooltip="Trip Information"><span class="ico">🛣️</span>Trip Information</button>
+  <button class="nav-item" data-view="jobrequests" data-tooltip="Job Request"><span class="ico">📝</span>Job Request</button>
   <button class="nav-item" data-view="jobcards" data-tooltip="Job Cards"><span class="ico">🛠️</span>Workshop Jobs</button>
   <button class="nav-item" data-view="attendance" data-tooltip="Attendance"><span class="ico">⏱️</span>Attendance</button>
   </nav>
@@ -54,13 +68,17 @@
       <span class="dot dot-live"></span> Apps Script API
       <div class="foot-status" id="apiStatus">checking…</div>
       <div class="foot-user" id="footUser"></div>
-      <div class="foot-buttons">
+            <div class="foot-buttons">
         <button class="logout-btn" id="logoutBtn">Log out</button>
         <button class="settings-btn" id="settingsBtn" title="User Settings" style="display:none;">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
+        </button>
+        <!-- ✅ අලුත් Theme Toggle බටන් එක -->
+        <button class="settings-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode" style="margin-left: 5px;">
+          🌙
         </button>
       </div>
     </div>
@@ -285,7 +303,7 @@
   </div>
   <div id="maintenanceContent"></div>
 </section>
-    <section class="view" id="view-licenseInsurance">
+<section class="view" id="view-licenseInsurance">
   <div class="view-head maintenance-head">
     <h1>License & Insurance Management</h1>
     <div class="subtabs" id="licenseInsuranceSubtabs">
@@ -293,6 +311,7 @@
       <button class="subtab-btn" data-submodule="Insurance">Insurance</button>
     </div>
   </div>
+  <div id="licenseVisualization" style="display:none;"></div>
   <div id="licenseInsuranceContent"></div>
 </section>
     <section class="view" id="view-Lubricant"></section>
@@ -345,6 +364,9 @@
   </div>
 </section>
 
+<section class="view" id="view-tripInfo"></section>
+<section class="view" id="view-jobrequests"></section>
+
     <!-- WORKSHOP JOB CARDS (KANBAN) -->
     <section class="view" id="view-jobcards">
       <div class="view-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -352,7 +374,13 @@
           <h1>Workshop Jobs</h1>
           <p class="sub">Manage repair and service requests between departments.</p>
         </div>
-        <button class="btn btn-primary" onclick="openForm('jobcards')">+ New Job Request</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+  <button class="btn btn-amber" onclick="openJobNotifModal()" style="position:relative; background:#F2A65A; color:#fff;">
+    🔔 Job Notifications
+    <span id="jobNotifBadge" style="position:absolute; top:-8px; right:-8px; background:#EF4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; font-weight:bold; display:none;">0</span>
+  </button>
+  <button class="btn btn-primary" onclick="openForm('jobcards')">+ New Job Request</button>
+</div>
       </div>
 
       <!-- ✅ අලුත් Report Filter එක -->
@@ -375,7 +403,11 @@
           <h1>Attendance Marking</h1>
           <p class="sub">Mark daily attendance for Transport and Automobile departments.</p>
         </div>
-        <input type="date" id="attendanceDate" style="padding:8px 12px; border:1px solid #dbe4ff; border-radius:8px; font-size:14px; font-weight:bold; color:var(--navy);">
+        <div class="date-nav-group">
+          <button class="date-nav-btn" id="prevDateBtn" title="Previous Day">◀</button>
+          <input type="date" id="attendanceDate" style="padding:8px 12px; border:1px solid #dbe4ff; border-radius:8px; font-size:14px; font-weight:bold; color:var(--navy);">
+          <button class="date-nav-btn" id="nextDateBtn" title="Next Day">▶</button>
+        </div>
       </div>
 
       <!-- ✅ අලුත් Attendance Report Filter එක -->
@@ -389,6 +421,13 @@
       <div class="dash-tabs" id="attendanceDeptTabs">
         <button class="dash-tab-btn active" data-dept="Transport">Transport Dept</button>
         <button class="dash-tab-btn" data-dept="Automobile">Automobile Dept</button>
+      </div>
+
+      <!-- ✅ Save All Defaults බටන් එක -->
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+        <button class="btn btn-primary" id="bulkSaveBtn" onclick="saveAllDefaults_()" style="display: none;">
+          💾 Save All Present
+        </button>
       </div>
 
       <div id="attendanceGrid" class="attendance-grid">
@@ -489,6 +528,82 @@
       </label>
 
       <button class="btn btn-primary" id="submitCompleteJobBtn" style="margin-top: 20px;" onclick="submitJobCompletion()">✔ Mark as Completed</button>
+    </div>
+  </div>
+</div>
+
+<!-- Start Job Modal -->
+<div class="modal-backdrop" id="startJobModal">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-head">
+      <h3>▶ Start Job</h3>
+      <button class="modal-close" onclick="document.getElementById('startJobModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom: 15px;">Job No: <b id="startJobNo" style="color:var(--navy); font-size:14px;"></b></p>
+      
+      <label class="field">
+        <span>Assigned Mechanic Name</span>
+        <input type="text" id="startJobMechanic" placeholder="e.g. Nuwan (Engine)" required>
+      </label>
+
+      <button class="btn btn-primary" id="submitStartJobBtn" style="margin-top: 20px;">▶ Start Job</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trip Info Modal -->
+<div class="modal-backdrop" id="tripInfoModalBackdrop">
+  <div class="modal" style="max-width: 800px;">
+    <div class="modal-head">
+      <h3 id="tripInfoModalTitle">Update Trip Information</h3>
+      <button class="modal-close" id="tripInfoModalCloseBtn">✕</button>
+    </div>
+    <div class="modal-body" id="tripInfoModalBody">
+      <!-- Form එක ඊළඟ පියවරේදී මෙතනට දාමු -->
+      <p class="hint" style="text-align: center;">Trip Info form coming in the next step...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Job Notifications Modal -->
+<div class="modal-backdrop" id="jobNotifModal">
+  <div class="modal" style="max-width: 800px;">
+    <div class="modal-head">
+      <h3>🔔 Transport Job Requests</h3>
+      <button class="modal-close" onclick="document.getElementById('jobNotifModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="jobNotifBody" style="padding: 0;">
+      <!-- Table එක මෙතනට එයි -->
+    </div>
+  </div>
+</div>
+
+<!-- Accept Job Modal -->
+<div class="modal-backdrop" id="acceptJobModal">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-head">
+      <h3>✔ Accept Job</h3>
+      <button class="modal-close" onclick="document.getElementById('acceptJobModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom: 15px;">Job No: <b id="acceptJobNo" style="color:var(--navy); font-size:14px;"></b></p>
+      
+      <label class="field">
+        <span>Priority</span>
+        <select id="acceptJobPriority">
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </label>
+
+      <label class="field" style="margin-top: 10px;">
+        <span>Other Details / Issues</span>
+        <input type="text" id="acceptJobOther" placeholder="e.g. Check brake fluid as well">
+      </label>
+
+      <button class="btn btn-primary" id="submitAcceptJobBtn" style="margin-top: 20px;">Accept & Send to Pending</button>
     </div>
   </div>
 </div>

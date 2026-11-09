@@ -296,41 +296,6 @@ button{
   background:rgba(255,255,255,0.12);
   margin:10px 8px;
 }
-.sidebar.collapsed .nav-item::after{
-  content:attr(data-tooltip);
-  position:absolute;
-  left:calc(100% + 14px);
-  top:50%;
-  transform:translateY(-50%);
-  background:#00245E;
-  color:#fff;
-  padding:7px 12px;
-  border-radius:8px;
-  font-size:12.5px;
-  font-weight:500;
-  white-space:nowrap;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity 0.2s ease;
-  z-index:200;
-  box-shadow:0 6px 16px rgba(0,0,0,0.25);
-  font-family:var(--body);
-}
-.sidebar.collapsed .nav-item::before{
-  content:"";
-  position:absolute;
-  left:calc(100% + 8px);
-  top:50%;
-  transform:translateY(-50%);
-  border:6px solid transparent;
-  border-right-color:#00245E;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity 0.2s ease;
-  z-index:200;
-}
-.sidebar.collapsed .nav-item:hover::after,
-.sidebar.collapsed .nav-item:hover::before{ opacity:1; }
 .sidebar.collapsed .logout-btn{
   width:42px;
   height:42px;
@@ -511,7 +476,8 @@ tbody td{
   border-bottom:1px solid var(--line);
   font-family:Arial, Helvetica, sans-serif;
   font-size:13px;
-  text-align:center;
+  text-align: left; /* ✅ දත්ත වම් පැත්තට */
+  padding-left: 12px; /* ✅ වම් පැත්තෙන් පොඩි ඉඩක් දෙන්න */
 }
 tbody tr:nth-child(even){ background:#d7e6ff; }
 tbody tr:hover{ background:#83abd9 !important; }
@@ -3200,7 +3166,7 @@ tbody td {
 /* Row Actions (Edit/Delete) බටන් තියෙන තීරුව පොඩ්ඩක් ලස්සන කරන්න */
 .row-actions {
   width: 1%;
-  text-align: center;
+  text-align: center !important; /* ✅ මේක විතරක් මැදට */
   white-space: nowrap;
 }
 
@@ -3803,3 +3769,834 @@ tbody td {
 #attendanceGrid::-webkit-scrollbar-thumb:hover {
   background: #8a9cb8;
 }
+
+/* ============================================
+   REMINDER BADGES (Dashboard Expiring Panel)
+   ============================================ */
+.rem-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--mono);
+  letter-spacing: 0.3px;
+}
+.rem-badge.sent {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* ============================================
+   ATTENDANCE DATE NAVIGATION BUTTONS
+   ============================================ */
+.date-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-nav-btn {
+  background: #ffffff;
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--navy);
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.date-nav-btn:hover {
+  background: #f0f4ff;
+  border-color: var(--steel);
+  color: var(--steel);
+}
+
+.date-nav-btn:active {
+  transform: scale(0.95);
+}
+
+/* ============================================
+   TABLE COLUMN FILTERS
+   ============================================ */
+thead th {
+  padding: 8px 6px; /* ටිකක් ඉඩ වැඩි කරමු */
+}
+
+/* Filter Input එකේ පෙනුම */
+.col-filter {
+  width: 100%;
+  padding: 4px 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  border: 1px solid #b8c4d9;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #333;
+  outline: none;
+  font-family: var(--body);
+  font-weight: normal;
+  text-transform: none; /* අකුරු ලොකු නොවී තියෙන්න */
+}
+
+.col-filter::placeholder {
+  color: #999;
+}
+
+.col-filter:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Dropdown එකක් නම් */
+select.col-filter {
+  padding: 3px 4px;
+}
+
+/* ============================================
+   COLUMN FILTER POPUP
+   ============================================ */
+.th-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.filter-icon {
+  font-size: 10px;
+  cursor: pointer;
+  color: #8a9cb8;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: 0.2s;
+}
+
+.filter-icon:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.filter-popup {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #dbe4ff;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0, 36, 94, 0.15);
+  z-index: 1000;
+  min-width: 220px;
+}
+
+/* ============================================
+   FILTER POPUP CHECKBOX LIST
+   ============================================ */
+.filter-checkbox-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #e4e8ee;
+  border-radius: 6px;
+  padding: 6px;
+  background: #fafbfe;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Scrollbar එක ලස්සන කරන්න */
+.filter-checkbox-list::-webkit-scrollbar { width: 5px; }
+.filter-checkbox-list::-webkit-scrollbar-track { background: transparent; }
+.filter-checkbox-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.filter-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #333;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.filter-checkbox-item:hover {
+  background: #eef1f7;
+}
+
+.filter-checkbox-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--steel); /* Checkbox එකේ පාට */
+}
+
+.filter-checkbox-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* ============================================
+   ACTIVE COLUMN FILTER HEADER COLOR
+   ============================================ */
+/* Filter එකක් දාලා තියෙන Column Header එකේ අකුරු සහ අයිකන් ලා නිල් පාට වෙනවා */
+th.filter-active .th-content {
+  color: #3b82f6 !important; /* Light Blue */
+}
+
+th.filter-active .filter-icon {
+  color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.15); /* අයිකන් එක පොඩ්ඩක් Highlight කරන්න */
+  border-radius: 4px;
+}
+
+/* අයිකන් එකට Hover කරද්දී සුදු පාට වෙන්න */
+th.filter-active .filter-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff !important;
+}
+
+/* ============================================
+   FILTER POPUP SEARCH INPUT
+   ============================================ */
+.filter-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #dbe4ff;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #333;
+  outline: none;
+  box-sizing: border-box;
+  font-family: var(--body);
+}
+
+.filter-search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.filter-search-input::placeholder {
+  color: #999;
+}
+
+/* ============================================
+   GLOBAL SIDEBAR TOOLTIP
+   ============================================ */
+.sidebar-tooltip {
+  position: fixed;
+  background: #00245E;
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 9999;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  font-family: var(--body);
+  transform: translateY(-50%);
+}
+
+/* ඊතලය (වම් පැත්තට) */
+.sidebar-tooltip::after {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #00245E;
+}
+
+/* Disabled Inputs (Locked Attendance) */
+.att-card[style*="cursor: not-allowed"] input,
+.att-card[style*="cursor: not-allowed"] button {
+  pointer-events: none;
+}
+.att-card[style*="cursor: not-allowed"] .att-header {
+  opacity: 0.5;
+}
+
+/* ============================================
+   LICENSE VISUALIZATION (Cards + 7-Day + Expired)
+   ============================================ */
+.license-visualization {
+  display: grid;
+  /* පළවෙනි 3ට සමාන පළල, 4වෙනි එකට ටිකක් ලොකුවට, 5වෙනි එකට සමාන පළල */
+  grid-template-columns: 1fr 1fr 1fr 1.6fr 1fr; 
+  gap: 12px; /* Gap එක ටිකක් අඩු කළා */
+  margin-bottom: 18px;
+}
+
+.license-viz-card {
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);
+  border: 1.5px solid #dbe4ff;
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 2px 6px rgba(0,36,94,0.06), 0 8px 24px rgba(0,36,94,0.04);
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+}
+
+.license-viz-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 14px 14px 0 0;
+}
+
+.license-viz-card.card-total::before     { background: linear-gradient(90deg, #00245E, #3B82F6); }
+.license-viz-card.card-updated::before   { background: linear-gradient(90deg, #10B981, #34D399); }
+.license-viz-card.card-remaining::before { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+.license-viz-card.card-7days::before     { background: linear-gradient(90deg, #EF4444, #F87171); }
+.license-viz-card.card-expired::before   { background: linear-gradient(90deg, #7F1D1D, #DC2626); }
+
+.viz-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.viz-card-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1B2430;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.viz-card-sub {
+  font-size: 11px;
+  color: #888;
+  margin-top: auto;
+}
+
+/* 7-day numbers */
+.day-numbers-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.day-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #eef1f7;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.day-num:hover {
+  background: #3B82F6;
+  color: #fff;
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.day-num.has-vehicles {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.day-num.has-vehicles:hover {
+  background: #EF4444;
+  color: #fff;
+}
+
+.day-num.today {
+  box-shadow: 0 0 0 2px #3B82F6;
+}
+
+.day-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 300px; /* ✅ Width එක වැඩි කළා */
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid #dbe4ff;
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0,36,94,0.18);
+  z-index: 200;
+  display: none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ✅ අලුත්: Mouse එක යන අතරමග Gap එක පියවන්න Invisible Bridge එකක් */
+.day-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -25px;
+  left: 0;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+}
+
+.day-dropdown-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #00245E;
+  padding: 6px 10px;
+  border-bottom: 1px solid #eef1f7;
+  margin-bottom: 6px;
+  letter-spacing: 0.4px;
+}
+
+.day-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  color: #333;
+}
+
+.day-dropdown-item:hover {
+  background: #f0f4ff;
+  color: #00245E;
+}
+
+.day-dropdown-item .vno {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+}
+
+.day-dropdown-item .vmeta {
+  color: #888;
+  font-size: 11px;
+}
+
+.day-dropdown-empty {
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+}
+
+.card-expired .viz-card-count { color: #b91c1c; }
+
+.expired-hint {
+  font-size: 11px;
+  color: #b91c1c;
+  font-weight: 600;
+  margin-top: auto; /* පහළට තල්ලු කරන්න */
+}
+
+/* ✅ අලුත්: Mouse එක යන අතරමග Gap එක පියවන්න Invisible Bridge එකක් */
+.expired-hover-list::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: transparent;
+}
+
+/* ✅ Active Filters (Click කරාම) */
+.day-num.active-filter {
+  background: #3B82F6 !important;
+  color: #fff !important;
+  border-color: #2563EB !important;
+  transform: scale(1.1);
+}
+
+/* ✅ හැම Card එකක්ම Click කරාම පාට වෙනස් වෙන්න */
+.license-viz-card.active-filter {
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 8px 24px rgba(0, 36, 94, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.license-viz-card.card-expired.active-filter {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3), 0 8px 24px rgba(239, 68, 68, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.license-viz-card {
+  transition: all 0.2s ease;
+}
+
+.expired-list-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #b91c1c;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid #fecaca;
+  margin-bottom: 6px;
+  letter-spacing: 0.4px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .license-visualization {
+    grid-template-columns: 1fr 1fr;
+  }
+  .license-viz-card.card-7days {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .license-visualization {
+    grid-template-columns: 1fr;
+  }
+  .license-viz-card {
+    min-height: 100px;
+  }
+  .viz-card-count { font-size: 26px; }
+}
+
+/* ✅ Update Trip Info Button */
+.btn-trip-info {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  background: #00245E; /* Navy Blue */
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-trip-info:hover {
+  background: #003d9e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 36, 94, 0.2);
+}
+
+/* ============================================
+   DARK MODE / LIGHT MODE THEME
+   ============================================ */
+
+/* ✅ Dark Mode වෙද්දී වෙනස් වෙන පාට */
+[data-theme="dark"] {
+  --navy:        #0f172a;
+  --navy-2:      #1e293b;
+  --steel:       #38bdf8;
+  --amber:       #fbbf24;
+  --amber-dark:  #b45309;
+  --green:       #10b981;
+  --red:         #ef4444;
+  --bg:          #0f172a;
+  --card:        #1e293b;
+  --text:        #f1f5f9;
+  --muted:       #94a3b8;
+  --line:        #334155;
+}
+
+/* පසුබිම් පාට වෙනස් කිරීම */
+[data-theme="dark"] body,
+[data-theme="dark"] .content,
+[data-theme="dark"] .dash-tabs {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Panel, Modal, Cards පාට වෙනස් කිරීම */
+[data-theme="dark"] .panel,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .info-card,
+[data-theme="dark"] .booking-item,
+[data-theme="dark"] .job-card,
+[data-theme="dark"] .att-card,
+[data-theme="dark"] .user-card,
+[data-theme="dark"] .expiring-row,
+[data-theme="dark"] .fuel-chart-container,
+[data-theme="dark"] .fuel-monthly-container,
+[data-theme="dark"] .fuel-location-container,
+[data-theme="dark"] .top-vehicles-panel {
+  background: var(--card);
+  border-color: var(--line);
+}
+
+/* Table පාට වෙනස් කිරීම */
+[data-theme="dark"] tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+[data-theme="dark"] tbody tr:hover { background: rgba(255, 255, 255, 0.08) !important; }
+[data-theme="dark"] thead th { background-color: #1e293b; color: #cbd5e1; border-bottom-color: var(--line); }
+
+/* Inputs සහ Forms */
+[data-theme="dark"] .field input,
+[data-theme="dark"] .field select,
+[data-theme="dark"] .toolbar input,
+[data-theme="dark"] .filter-search-input,
+[data-theme="dark"] .chart-toolbar select,
+[data-theme="dark"] .booking-filters input,
+[data-theme="dark"] .booking-filters select {
+  background: var(--navy-2);
+  color: var(--text);
+  border-color: var(--line);
+}
+[data-theme="dark"] .field input[readonly] {
+  background: #0f172a;
+}
+
+/* වෙනත් සුළු වෙනස්කම් */
+[data-theme="dark"] .combobox-dropdown { background: var(--card); border-color: var(--line); }
+[data-theme="dark"] .combobox-item:hover { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] .line-chart-axis-label, 
+[data-theme="dark"] .combo-axis-label { fill: var(--muted); }
+[data-theme="dark"] .sidebar { background: linear-gradient(to left, #020617, #0f172a); }
+[data-theme="dark"] .dash-tab-btn { background: var(--navy-2); border-color: var(--line); color: var(--muted); }
+[data-theme="dark"] .dash-tab-btn.active { background: var(--steel); color: var(--navy); }
+[data-theme="dark"] .top-vehicle-row:hover { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] .top-vehicle-bar-wrap { background: var(--navy-2); }
+[data-theme="dark"] .modal-head { background: var(--card); border-bottom-color: var(--line); }
+[data-theme="dark"] .filter-popup { background: var(--card); border-color: var(--line); }
+[data-theme="dark"] .filter-checkbox-list { background: var(--bg); border-color: var(--line); }
+[data-theme="dark"] .filter-checkbox-item:hover { background: rgba(255,255,255,0.05); }
+
+/* ============================================
+   DARK MODE - ATTENDANCE CARD FIXES
+   ============================================ */
+[data-theme="dark"] .att-emp-name {
+  color: #ffffff !important; /* නම සුදු පාට කළා */
+}
+
+[data-theme="dark"] .att-header {
+  border-bottom-color: var(--line); /* ඉරි ගැසීම */
+}
+
+[data-theme="dark"] .att-btn {
+  background: var(--navy-2);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+/* බටන්ස් ඔබද්දී (Active) පාට */
+[data-theme="dark"] .att-btn.active[data-status="Present"] {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border-color: #22c55e;
+}
+[data-theme="dark"] .att-btn.active[data-status="Absent"] {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: #ef4444;
+}
+[data-theme="dark"] .att-btn.active[data-status="Half Day"] {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-color: #f59e0b;
+}
+[data-theme="dark"] .att-btn.active[data-status="Leave"] {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-color: #3b82f6;
+}
+
+/* ============================================
+   DARK MODE - BOOKING VIEW & CALENDAR FIXES
+   ============================================ */
+
+/* 1. දකුණු පැත්තේ Booking List එකේ අකුරු පාට හැදීම */
+[data-theme="dark"] .booking-details-grid span:first-child {
+  color: var(--muted) !important;
+}
+[data-theme="dark"] .booking-details-grid span:last-child {
+  color: var(--text) !important;
+}
+[data-theme="dark"] .booking-item {
+  background: var(--card);
+  border-color: var(--line);
+}
+[data-theme="dark"] .booking-item-header {
+  border-bottom-color: var(--line);
+}
+[data-theme="dark"] .booking-time-pill {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--steel);
+}
+[data-theme="dark"] .booking-details-panel .panel-head {
+  background: var(--navy-2) !important;
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="dark"] .booking-details-panel .panel-head h2 {
+  color: var(--text) !important;
+}
+
+/* Update Trip Info බටන් එකේ පාට */
+[data-theme="dark"] .btn-trip-info {
+  background: var(--steel);
+  color: var(--navy);
+}
+[data-theme="dark"] .btn-trip-info:hover {
+  background: #0ea5e9;
+}
+
+/* 2. FullCalendar එකේ පාට හැදීම */
+[data-theme="dark"] .fc-theme-standard td,
+[data-theme="dark"] .fc-theme-standard th {
+  border-color: var(--line);
+}
+[data-theme="dark"] .fc-theme-standard .fc-scrollgrid {
+  border-color: var(--line);
+}
+[data-theme="dark"] .fc .fc-col-header-cell {
+  background-color: var(--navy-2) !important;
+  color: var(--text);
+}
+[data-theme="dark"] .fc .fc-daygrid-day {
+  background-color: var(--card) !important;
+}
+[data-theme="dark"] .fc .fc-daygrid-day-number {
+  color: var(--text);
+}
+[data-theme="dark"] .fc .fc-toolbar-title {
+  color: var(--text);
+}
+[data-theme="dark"] .fc .fc-button-primary {
+  background-color: var(--steel) !important;
+  border-color: var(--steel) !important;
+  color: var(--navy) !important;
+}
+[data-theme="dark"] .fc .fc-button-primary:hover {
+  background-color: #0ea5e9 !important;
+}
+
+/* 3. සෙනසුරාදා සහ ඉරිදා දවස් වල පාට හැදීම */
+[data-theme="dark"] .fc .fc-day-sun { background-color: rgba(239, 68, 68, 0.05) !important; }
+[data-theme="dark"] .fc .fc-day-sat { background-color: rgba(255, 255, 255, 0.02) !important; }
+[data-theme="dark"] .fc .fc-col-header-cell.fc-day-sun { background-color: rgba(239, 68, 68, 0.15) !important; color: #f87171 !important; }
+[data-theme="dark"] .fc .fc-col-header-cell.fc-day-sat { background-color: rgba(255, 255, 255, 0.05) !important; color: #94a3b8 !important; }
+[data-theme="dark"] .fc .fc-day-sun .fc-daygrid-day-number { color: #f87171 !important; }
+[data-theme="dark"] .fc .fc-day-sat .fc-daygrid-day-number { color: #94a3b8 !important; }
+
+/* ============================================
+   DARK MODE - BOOKING ITEM TEXT COLORS
+   ============================================ */
+
+/* වාහනේ අංකය සුදු පාට (හෝ ලා පාට) කිරීම */
+[data-theme="dark"] .booking-vehicle {
+  color: var(--text) !important;
+}
+
+/* ලේබල් (Driver:, Requested By: වගේ) ලා අළු පාට කිරීම */
+[data-theme="dark"] .booking-details-grid span:nth-child(odd) {
+  color: var(--muted) !important;
+}
+
+/* දත්ත (D.M.Gamini..., Colombo වගේ) සුදු පාට කිරීම */
+[data-theme="dark"] .booking-details-grid span:nth-child(even) {
+  color: var(--text) !important;
+}
+
+/* Driver Name එක තද අකුරු වලින් (<b>) තියෙන නිසා ඒකත් සුදු පාට කිරීම */
+[data-theme="dark"] .booking-details-grid span:nth-child(even) b {
+  color: var(--text) !important;
+}
+
+/* Booking එකේ අංකය (BK-2026-11-001) */
+[data-theme="dark"] .booking-item-header span[style*="font-family: var(--mono)"] {
+  color: var(--muted) !important;
+}
+
+/* ============================================
+   DARK MODE - WORKSHOP JOBS (KANBAN) FIXES
+   ============================================ */
+
+/* 1. Job Card එකේ අකුරු පාට හැදීම */
+[data-theme="dark"] .job-card-details {
+  color: var(--text) !important;
+}
+[data-theme="dark"] .detail-row span:first-child {
+  color: var(--muted) !important;
+}
+
+/* 2. Edit සහ Print බටන්ස් වල පාට හැදීම */
+[data-theme="dark"] .btn-edit-job {
+  background: var(--navy-2);
+  color: var(--text);
+}
+[data-theme="dark"] .btn-edit-job:hover {
+  background: var(--line);
+}
+
+/* Completed කරපු ඒවායේ Duration බටන් එක (Disabled) */
+[data-theme="dark"] .btn-edit-job[disabled] {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .btn-print-job {
+  background: var(--navy-2);
+  border-color: var(--line);
+  color: var(--text);
+}
+[data-theme="dark"] .btn-print-job:hover {
+  background: var(--line);
+}
+
+/* 3. Completed කරපු ඒවායේ Feedback එකේ පාට හැදීම */
+[data-theme="dark"] .feedback-row {
+  background: rgba(34, 197, 94, 0.1) !important; /* ලා කොළ පාටක් */
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+[data-theme="dark"] .feedback-row span:first-child {
+  color: #4ade80 !important;
+}
+[data-theme="dark"] .feedback-text {
+  color: #4ade80 !important;
+}
+
+/* 4. Job Card එකේ උඩ තියෙන අංකය (AMJ-000001) */
+[data-theme="dark"] .job-card-type {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--steel);
+}
+
+/* Dark Mode Notification Table */
+[data-theme="dark"] #jobNotifBody table { min-width: 100%; }
+[data-theme="dark"] #jobNotifBody tbody tr:hover { background: rgba(255,255,255,0.08) !important; }

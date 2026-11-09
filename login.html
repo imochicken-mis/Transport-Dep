@@ -121,7 +121,14 @@ body{ overflow:hidden; position:relative; }
     try {
       const res = await Api.login(username, password);
       if (res.success) {
-        sessionStorage.setItem("vms_user", JSON.stringify({ username: res.username, role: res.role, allowedTabs: res.allowedTabs || [], noEditTabs: res.noEditTabs || [], noDeleteTabs: res.noDeleteTabs || [] }));
+        sessionStorage.setItem("vms_user", JSON.stringify({
+         username: res.username,
+         role: res.role,
+         allowedTabs: res.allowedTabs || [],
+         noEditTabs: res.noEditTabs || [],
+         noDeleteTabs: res.noDeleteTabs || [],
+         token: res.token          // ⬅️ මේක තමයි 6C — අලුතෙන් එකතු කරන එකම දේ
+        }));
         window.location.href = "index.html";
       } else {
         errorEl.textContent = "Wrong username or password.";

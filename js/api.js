@@ -1,28 +1,41 @@
 // ===================================================================
-// API Wrapper — handles all communication with Google Apps Script backend
+// API Wrapper — with session-token authentication
 // ===================================================================
 
 const Api = {
-  /**
-   * Fetch all rows from a sheet
-   * @param {string} sheet - Sheet name
-   * @returns {Promise<Array>} Array of row objects
-   */
+  _getToken() {
+    try {
+      const user = JSON.parse(sessionStorage.getItem("vms_user") || "null");
+      return user && user.token ? user.token : "";
+    } catch (e) {
+      return "";
+    }
+  },
+
+  _handleUnauthorized_() {
+    sessionStorage.removeItem("vms_user");
+    alert("Session expired. Please log in again.");
+    window.location.href = "login.html";
+  },
+
   async list(sheet) {
-    const url = `${API_URL}?sheet=${encodeURIComponent(sheet)}&action=list`;
+    const token = this._getToken();
+    const url = `${API_URL}?sheet=${encodeURIComponent(sheet)}&action=list&token=${encodeURIComponent(token)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`API error (${res.status}): ${res.statusText}`);
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) {
+      if (String(data.error).toLowerCase().includes("unauthorized")) {
+        this._handleUnauthorized_();
+        throw new Error("Session expired");
+      }
+      throw new Error(data.error);
+    }
     return data;
   },
 
-  /**
-   * Send POST request to Apps Script backend
-   * @param {Object} payload - { sheet, action, data }
-   * @returns {Promise<Object>} Response from server
-   */
   async _post(payload) {
+    payload.token = this._getToken();
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -30,58 +43,36 @@ const Api = {
     });
     if (!res.ok) throw new Error(`API error (${res.status}): ${res.statusText}`);
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) {
+      if (String(data.error).toLowerCase().includes("unauthorized")) {
+        this._handleUnauthorized_();
+        throw new Error("Session expired");
+      }
+      throw new Error(data.error);
+    }
     return data;
   },
 
-  /**
-   * Add a new record
-   * @param {string} sheet - Sheet name
-   * @param {Object} data - Record data (key-value pairs)
-   * @returns {Promise<Object>} Response with new ID
-   */
   add(sheet, data, username) {
     return this._post({ sheet, action: "add", data, user: username || "" });
   },
 
-  /**
-   * Update an existing record
-   * @param {string} sheet - Sheet name
-   * @param {Object} data - Record data including ID
-   * @returns {Promise<Object>} Response
-   */
   update(sheet, data, username) {
     return this._post({ sheet, action: "update", data, user: username || "" });
   },
 
-  /**
-   * Delete a record
-   * @param {string} sheet - Sheet name
-   * @param {string|number} id - Record ID
-   * @returns {Promise<Object>} Response
-   */
   remove(sheet, id) {
     return this._post({ sheet, action: "delete", data: { id } });
   },
 
-  /**
-   * User login
-   * @param {string} username
-   * @param {string} password
-   * @returns {Promise<Object>} { success, username, role, allowedTabs, ... }
-   */
   login(username, password) {
     return this._post({
       sheet: "Users",
       action: "login",
-      data: { username, password }
+      data: { username, password },
     });
   },
 
-  /**
-   * Check API connectivity
-   * @returns {Promise<boolean>}
-   */
   async ping() {
     try {
       await this.list("Vehicles");
@@ -89,5 +80,5 @@ const Api = {
     } catch {
       return false;
     }
-  }
+  },
 };

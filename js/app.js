@@ -39,6 +39,9 @@ let attendanceDate_ = new Date().toISOString().split("T")[0]; // අද දි�
 let attendanceDept_ = "Transport";
 let currentEmployeeDept_ = "Transport"; // Default
 let pendingHighlightVehicle_ = null; // Row එක Highlight කරන්න ඕන වාහනේ
+let activeColumnFilters_ = {}; // එක එක Column වලට දාපු Filter අගයන්
+let currentFilterCol_ = null;  // දැනට අරින Popup එකේ Column එක
+let currentLicenseDateFilter_ = null; // { type: 'date', date: '2026-11-10' } හෝ { type: 'expired' }
 
 
 // ===================================================================
@@ -64,7 +67,8 @@ const MODULES = {
       { key: "CurrentOwner", label: "Current Owner", type: "text" },
       { key: "Location", label: "Location", type: "text" },
       { key: "Department", label: "Department", type: "text" },
-      { key: "User", label: "User/Driver", type: "text" },
+      { key: "Purpose", label: "Purpose", type: "select", options: [ "-Select Type-","FG-Transport", "Feed-Transport", "LB-Transport", "P-Transport", "Personal", "RM-Transport", "Others"] },
+      { key: "Username", label: "User/Driver", type: "text" },
       { key: "UserPosition", label: "User Position", type: "text" },
       { key: "UserMobile", label: "User Mobile", type: "number" },
       { key: "UserMail", label: "User Mail", type: "text" },
@@ -157,7 +161,7 @@ const MODULES = {
       { key: "Remarks", label: "Remarks", type: "text" },
     ],
   },
-  License: {
+      License: {
     sheet: "License",
     title: "License Records",
     singular: "New Record",
@@ -165,12 +169,19 @@ const MODULES = {
     fields: [
       { key: "ID", label: "ID", auto: true },
       { key: "VehicleID", label: "Vehicle No", type: "text", required: true },
-      { key: "LicenseNo", label: "License No", type: "text" },
+      // ✅ අලුතෙන් එකතු කළ Checkboxes 3
+      { key: "User", label: "User/Driver", type: "text", auto: true }, // ✅ NEW
+      { key: "License", label: "License", type: "checkbox" },
+      { key: "Emission", label: "Emission", type: "checkbox" },
+      { key: "Fitness", label: "Fitness", type: "checkbox" },
+      
       { key: "FromDate", label: "From Date", type: "date" },
       { key: "ToDate", label: "To Date", type: "date" },
       { key: "LicenseExpiry", label: "Days to Expiry", type: "text", auto: true, computedFrom: "ToDate" },
-      { key: "Cost", label: "Cost (Rs.LKR)", type: "number" },
-    ],
+      { key: "1st reminder", label: "1st Reminder", auto: true },
+      { key: "2nd Reminder", label: "2nd Reminder", auto: true },
+      { key: "3rd Reminder", label: "3rd Reminder", auto: true },
+    ]
   },
   Insurance: {
     sheet: "Insurance",
@@ -180,6 +191,7 @@ const MODULES = {
     fields: [
       { key: "ID", label: "ID", auto: true },
       { key: "VehicleID", label: "Vehicle No", type: "text", required: true },
+      { key: "User", label: "User/Driver", type: "text", auto: true }, // ✅ NEW
       { key: "InsuranceCompany", label: "Insurance Co.", type: "select", options: ["-", "Ceylinco General", "Continental", "HNB General", "Sri Lanka Insurance"] },
       { key: "Type", label: "Type", type: "select", options: ["-", "Full", "3rd Party"] },
       { key: "PolicyNo", label: "Policy No", type: "text" },
@@ -226,23 +238,25 @@ const MODULES = {
       { key: "Remarks", label: "Remarks", type: "text" },
     ],
   },
-  bookings: {
+    bookings: {
     sheet: "Bookings",
     title: "Vehicle Booking",
     singular: "New Booking",
     idField: "ID",
     fields: [
       { key: "ID", label: "ID", auto: true },
-      { key: "Vehicle No", label: "Vehicle No", type: "text", required: true },
-      { key: "Driver Name", label: "Driver Name", type: "text" }, // ⬅️ මේක අලුතෙන් එකතු කළා
-      { key: "Requested By", label: "Requested By", type: "text", required: true },
-      { key: "Department", label: "Department", type: "text" },
+      { key: "Booking Number", label: "Booking Number", type: "text", auto: true },
       { key: "From Date", label: "From Date", type: "date", required: true },
-      { key: "From Time", label: "From Time (e.g. 08:00)", type: "time", required: true },
+      { key: "From Time", label: "From Time", type: "time", required: true },
       { key: "To Date", label: "To Date", type: "date", required: true },
-      { key: "To Time", label: "To Time (e.g. 17:00)", type: "time", required: true },
+      { key: "To Time", label: "To Time", type: "time", required: true },
+      { key: "Transport Type", label: "Transport Type", type: "select", options: [] }, // ✅ අලුත් Field එක
+      { key: "Vehicle No", label: "Vehicle No", type: "select", options: [], required: true },
       { key: "Destination", label: "Destination", type: "text" },
       { key: "Purpose", label: "Purpose", type: "text" },
+      { key: "Requested By", label: "Requested By", type: "text", required: true },
+      { key: "Department", label: "Department", type: "text" },
+      { key: "Driver Name", label: "Driver Name", type: "select", options: [] }, // Dropdown
     ],
   },
     jobcards: {
@@ -259,11 +273,69 @@ const MODULES = {
       { key: "Description", label: "Description / Issue", type: "text", required: true },
       { key: "Priority", label: "Priority", type: "select", options: ["High", "Medium", "Low"] },
       { key: "Assigned To", label: "Assigned To (Mechanic)", type: "text" },
-      { key: "Other Details", label: "Other Repairs / Issues", type: "text" }, // ⬅️ අලුතෙන් එකතු කළා
+      { key: "Other Details", label: "Other Repairs / Issues", type: "text" },
       { key: "Remarks", label: "Remarks", type: "text" },
+      { key: "Start Date", label: "Start Date", auto: true, hidden: true },      // ✅ NEW
       { key: "Complete Date", label: "Complete Date", auto: true, hidden: true },
       { key: "Final Cost", label: "Final Cost (Rs.)", auto: true, hidden: true },
       { key: "Feedback", label: "Feedback for Mechanic", auto: true, hidden: true },
+    ],
+  },
+    tripInfo: {
+    sheet: "TripInfo",
+    title: "Trip Information",
+    singular: "Trip Info",
+    idField: "ID",
+    fields: [
+      { key: "ID", label: "ID", auto: true },
+      { key: "BookingID", label: "Booking ID", auto: true },
+      { key: "Booking Number", label: "Booking Number", type: "text", auto: true },
+      { key: "Trip Number", label: "Trip Number", type: "text" },
+      { key: "Date", label: "Date", type: "date" },
+      { key: "Vehicle Number", label: "Vehicle Number", type: "text" },
+      { key: "Driver Name", label: "Driver Name", type: "text" },
+      { key: "Helper Name", label: "Helper Name", type: "text" },
+      { key: "Trip Type", label: "Trip Type", type: "text" },
+      { key: "Location & Route", label: "Location & Route", type: "text" },
+      { key: "Load Weight", label: "Load Weight", type: "text" },
+      { key: "Out Time", label: "Out Time", type: "time" },
+      { key: "Odometer Start", label: "Odometer Start", type: "number" },
+      { key: "Fuel Quantity", label: "Fuel Quantity", type: "text" },
+      { key: "Fuel Receipt No", label: "Fuel Receipt No", type: "text" },
+      { key: "In Time", label: "In Time", type: "time" },
+      { key: "Odometer End", label: "Odometer End", type: "number" },
+      { key: "Total Trip (Km)", label: "Total Trip (Km)", type: "number" },
+      { key: "Inspected", label: "Inspected", type: "text" },
+      { key: "External damage", label: "External damage", type: "text" },
+      { key: "Mechanical defects", label: "Mechanical defects", type: "text" },
+      { key: "Accidents", label: "Accidents", type: "text" },
+    ],
+  },
+    jobrequests: {
+    sheet: "JobCards",
+    title: "Job Requests",
+    singular: "New Job Request",
+    idField: "ID",
+    fields: [
+      { key: "ID", label: "ID", auto: true },
+      { key: "Vehicle No", label: "Vehicle No", type: "text", required: true },
+      { key: "Requested By", label: "Requested By", type: "text", required: true },
+      { key: "Date", label: "Date", type: "date" },
+      { key: "Job Type", label: "Job Type", type: "select", options: ["Repair", "Service", "Inspection", "Other"] },
+      { key: "Description", label: "Description / Issue", type: "text", required: true },
+      
+      // ✅ අලුතෙන් එකතු කළ Fields 2 (Readonly)
+      { key: "Driver Name", label: "Driver / User", type: "text", readonly: true },
+      { key: "Department", label: "Department", type: "text", readonly: true },
+
+      // සැඟවුණු Fields
+      { key: "Status", label: "Status", type: "text", auto: true },
+      { key: "Accepted By", label: "Accepted By", type: "text", auto: true },
+      { key: "Assigned To", label: "Assigned To", type: "text", auto: true, hidden: true },
+      { key: "Start Date", label: "Start Date", auto: true, hidden: true },
+      { key: "Complete Date", label: "Complete Date", auto: true, hidden: true },
+      { key: "Final Cost", label: "Final Cost", auto: true, hidden: true },
+      { key: "Feedback", label: "Feedback", auto: true, hidden: true },
     ],
   },
 };
@@ -406,15 +478,31 @@ function showView(key) {
   viewTitle.textContent = navLabel ? navLabel.textContent.trim() : key;
   sidebar.classList.remove("open");
 
-  if (key === "maintenance") { renderMaintenanceGroup(); }
-  else if (key === "licenseInsurance") { renderLicenseInsuranceGroup(); }
-  else if (key === "bookings" && !bookingsLoaded_) { loadBookingsView(); bookingsLoaded_ = true; }
-  else if (key === "jobcards" && !jobCardsLoaded_) { loadJobCardsView(); jobCardsLoaded_ = true; }
-  else if (key === "attendance" && !attendanceLoaded_) { loadAttendanceView(); attendanceLoaded_ = true; }
-  else if (MODULES[key]) renderModule(key);
+  // ✅ Custom views — මේවා renderModule එකට fall through වෙන්න බෑ (return)
+  if (key === "maintenance") { renderMaintenanceGroup(); return; }
+  if (key === "licenseInsurance") { renderLicenseInsuranceGroup(); return; }
+  if (key === "employees") { renderEmployeesGroup(); return; }
 
-  if (key === "dashboard" && !dashboardLoaded_) loadDashboard();
-  if (key === "tracking" && !trackingLoaded_) { loadTracking(); trackingLoaded_ = true; }
+  if (key === "bookings") { loadBookingsView(); return; }
+  if (key === "jobcards") { loadJobCardsView(); return; }
+
+  if (key === "attendance") {
+    if (!attendanceLoaded_) { loadAttendanceView(); attendanceLoaded_ = true; }
+    return;
+  }
+
+  if (key === "dashboard") {
+    if (!dashboardLoaded_) loadDashboard();
+    return;
+  }
+
+  if (key === "tracking") {
+    if (!trackingLoaded_) { loadTracking(); trackingLoaded_ = true; }
+    return;
+  }
+
+  // ✅ Generic CRUD modules විතරයි මෙතනට එන්නේ (Vehicles, Fuel, License, etc.)
+  if (MODULES[key]) renderModule(key);
 }
 
 
@@ -449,71 +537,145 @@ async function renderModule(key, targetId) {
   moduleTargets[key] = resolvedTarget;
   const root = document.getElementById(resolvedTarget);
 
-  // ✅ සාමාන්‍ය විදියටම ටැබ් එක load වෙලා තියෙනවා නම් ආයේ load කරන්නේ නැහැ
-  if (root.dataset.renderedKey === key) return;
-  root.dataset.renderedKey = key;
+  // ✅ UI structure එක එක පාරක් විතරයි හදන්නේ
+  if (root.dataset.renderedKey !== key) {
+    root.dataset.renderedKey = key;
 
-  let cardsHtml = "";
-  if (key === "vehicles") {
-    cardsHtml = `<div id="vehicleStatsCards" class="stats-card-container"></div>`;
-  } else if (key === "fuel") {
-    cardsHtml = `<div id="fuelOverview" class="fuel-overview"></div>`;
-  }
+    let cardsHtml = "";
+    if (key === "vehicles") {
+      cardsHtml = `<div id="vehicleStatsCards" class="stats-card-container"></div>`;
+    } else if (key === "fuel") {
+      cardsHtml = `<div id="fuelOverview" class="fuel-overview"></div>`;
+    }
 
-  const isSubModule = (resolvedTarget === "employeeContent");
-  const titleHtml = isSubModule ? "" : `
-    <div class="view-head" style="display: flex; justify-content: space-between; align-items: center;">
-      <h1>${mod.title}</h1>
-      ${key === 'vehicles' ? `<button class="btn" id="resetVehicleFilterBtn" style="display:none; background:#00245E; color:white; padding: 6px 12px; font-size: 13px;">Show All Types</button>` : ''}
-    </div>
-  `;
+    const isSubModule = (resolvedTarget === "employeeContent");
+    const titleHtml = isSubModule ? "" : `
+      <div class="view-head" style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>${mod.title}</h1>
+        ${key === 'vehicles' ? `<button class="btn" id="resetVehicleFilterBtn" style="display:none; background:#00245E; color:white; padding: 6px 12px; font-size: 13px;">Show All Types</button>` : ''}
+        ${key === 'License' ? `<button class="btn" id="resetLicenseFilterBtn" style="display:none; background:#00245E; color:white; padding: 6px 12px; font-size: 13px;">Show All Licenses</button>` : ''}
+      </div>
+    `;
 
-  root.innerHTML = `
-    ${titleHtml}
-    ${cardsHtml}
-    <div class="toolbar">
-      <input type="search" placeholder="Search ${mod.title.toLowerCase()}…" id="search-${key}">
-      <button class="btn btn-amber" id="addBtn-${key}">+ Add ${mod.singular || mod.title.slice(0, -1)}</button>
-    </div>
-    <div class="panel"><div class="panel-body table-scroll">
-      <table><thead><tr>
-        ${mod.fields.filter((f) => !f.hidden).map((f) => `<th>${f.label}</th>`).join("")}
-        <th></th>
-      </tr></thead>
-      <tbody id="tbody-${key}">
-        <tr><td colspan="${mod.fields.filter((f) => !f.hidden).length + 1}">Loading…</td></tr>
-      </tbody>
-      </table>
-    </div></div>`;
+    root.innerHTML = `
+      ${titleHtml}
+      ${cardsHtml}
+      <div class="toolbar">
+        <input type="search" placeholder="Search ${mod.title.toLowerCase()}…" id="search-${key}">
+        <button class="btn btn-amber" id="addBtn-${key}">+ Add ${mod.singular || mod.title.slice(0, -1)}</button>
+      </div>
+      <div class="panel"><div class="panel-body table-scroll">
+        <table><thead><tr>
+          ${mod.fields.filter((f) => !f.hidden).map((f) => `
+            <th data-col-key="${f.key}">
+              <div class="th-content">
+                ${f.label}
+                <span class="filter-icon" onclick="openColumnFilter(event, '${key}', '${f.key}', '${f.type || 'text'}')" title="Filter ${f.label}">▾</span>
+              </div>
+            </th>
+          `).join("")}
+          <th></th>
+        </tr></thead>
+        <tbody id="tbody-${key}">
+          <tr><td colspan="${mod.fields.filter((f) => !f.hidden).length + 1}">Loading…</td></tr>
+        </tbody>
+        </table>
+      </div></div>`;
 
-  document.getElementById(`addBtn-${key}`).addEventListener("click", () => openForm(key));
-  document.getElementById(`search-${key}`).addEventListener("input", (e) => paintRows(key, e.target.value));
+    document.getElementById(`addBtn-${key}`).addEventListener("click", () => openForm(key));
+    document.getElementById(`search-${key}`).addEventListener("input", (e) => paintRows(key, e.target.value));
 
-    // Reset Filter Button Logic
-  if (key === 'vehicles') {
-    const resetBtn = document.getElementById("resetVehicleFilterBtn");
-    if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-        currentVehicleTypeFilter_ = null;
-        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
-        resetBtn.style.display = 'none';
-        paintRows('vehicles', document.getElementById('search-vehicles').value);
+    root.querySelectorAll('.col-filter').forEach(el => {
+      el.addEventListener('input', () => {
+        const searchVal = document.getElementById(`search-${key}`)?.value || "";
+        paintRows(key, searchVal);
       });
+      el.addEventListener('change', () => {
+        const searchVal = document.getElementById(`search-${key}`)?.value || "";
+        paintRows(key, searchVal);
+      });
+    });
+
+    if (key === 'vehicles') {
+      const resetBtn = document.getElementById("resetVehicleFilterBtn");
+      if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+          currentVehicleTypeFilter_ = null;
+          document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
+          resetBtn.style.display = 'none';
+          paintRows('vehicles', document.getElementById('search-vehicles').value);
+        });
+      }
+    }
+        // ✅ License Reset Button Logic
+    if (key === 'License') {
+      const resetLicBtn = document.getElementById("resetLicenseFilterBtn");
+      if (resetLicBtn) {
+        if (currentLicenseDateFilter_) resetLicBtn.style.display = 'block';
+        resetLicBtn.addEventListener("click", () => {
+          currentLicenseDateFilter_ = null;
+          resetLicBtn.style.display = 'none';
+          renderLicenseVisualization(); // Cards වල Active පාට අයින් කරන්න
+          paintRows('License', document.getElementById('search-License').value);
+        });
+      }
     }
   }
 
-  try {
+  // ✅ හැම වෙලාවෙම data refresh කරන්න (structure එක තියෙනවා නම්)
+    try {
     const rows = await Api.list(mod.sheet);
+
+    // ✅ NEW: License/Insurance සඳහා Vehicles sheet එකෙන් User ගේ නම ගෙන එකතු කිරීම
+    if (key === "License" || key === "Insurance") {
+      if (!cache.Vehicles || cache.Vehicles.length === 0) {
+        try { cache.Vehicles = await Api.list("Vehicles"); } catch (e) {}
+      }
+      const vehicles = cache.Vehicles || [];
+      
+      // Vehicles sheet එකේ ඩ්‍රයිවර් ගේ නම තියෙන column එක හොයාගන්න
+      const sampleV = vehicles[0] || {};
+      let userKey = null;
+      // ✅ "Username" එක මුලින්ම හොයන්න
+      const possibleKeys = ["Username", "User", "User/Driver", "Driver Name", "User Name", "Driver"];
+      for (const k of possibleKeys) {
+        if (sampleV[k] !== undefined) {
+          userKey = k;
+          break;
+        }
+      }
+
+      const vehicleUserMap = {};
+      if (userKey) {
+        vehicles.forEach(v => {
+          // ✅ අකුරු අතර තියෙන හැම space එකක්ම (උදා: WP CBD - 6837) අයින් කරලා match කරනවා
+          const vNo = String(v["Vehicle No"] || "").replace(/\s+/g, '').toLowerCase(); 
+          if (vNo) {
+            vehicleUserMap[vNo] = String(v[userKey] || "").trim() || "—";
+          }
+        });
+      }
+
+      rows.forEach(r => {
+        // ✅ License sheet එකේ තියෙන අංකයේ තියෙන spaces ටිකත් අයින් කරලා match කරනවා
+        const vId = String(r.VehicleID || "").replace(/\s+/g, '').toLowerCase();
+        r.User = vehicleUserMap[vId] || "—"; 
+      });
+    }
+
     cache[mod.sheet] = rows;
-    paintRows(key, "");
+    const searchVal = document.getElementById(`search-${key}`)?.value || "";
+    paintRows(key, searchVal);
 
     if (key === "vehicles") renderVehicleStatsCards();
     if (key === "fuel") renderFuelOverview();
 
     root.dataset.rendered = "true";
   } catch (err) {
-    document.getElementById(`tbody-${key}`).innerHTML =
-      `<tr><td colspan="${mod.fields.filter((f) => !f.hidden).length + 1}">❌ Couldn't load data — ${err.message}</td></tr>`;
+    const tbody = document.getElementById(`tbody-${key}`);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="${mod.fields.filter((f) => !f.hidden).length + 1}">❌ Couldn't load data — ${err.message}</td></tr>`;
+    }
   }
 }
 
@@ -521,25 +683,83 @@ function paintRows(key, filterText) {
   const mod = MODULES[key];
   let rows = cache[mod.sheet] || [];
 
-  // ✅ Drivers සහ Mechanics වෙන් කරන්න
+  // 1️⃣ Column Filters (Popup එකෙන් තෝරපු ඒවා)
+  Object.keys(activeColumnFilters_).forEach(filterKey => {
+    const [tableKey, colKey] = filterKey.split("_");
+    if (tableKey === key) {
+      let filterVals = activeColumnFilters_[filterKey];
+      if (!Array.isArray(filterVals)) filterVals = [filterVals];
+
+      rows = rows.filter(r => {
+        const cellValue = String(r[colKey] || "").trim().toLowerCase();
+        return filterVals.some(val => String(val).toLowerCase() === cellValue);
+      });
+    }
+  });
+
+  // 2️⃣ Vehicle Type Filter (Cards වලින් click කරද්දී)
+  if (key === 'vehicles' && currentVehicleTypeFilter_ && Array.isArray(currentVehicleTypeFilter_.types)) {
+    rows = rows.filter(v => {
+      const type = String(v.Type || "").toLowerCase().trim();
+      // ✅ අකුරු වල පොඩි/ලොකු කම් සහ හිස් ඉඩ ගැලපෙන්න
+      return currentVehicleTypeFilter_.types.some(t => type.includes(String(t).toLowerCase().trim()));
+    });
+  }
+
+  // 3️⃣ Global Search Box Filter
+  rows = rows.filter((r) =>
+    JSON.stringify(r).toLowerCase().includes(filterText.toLowerCase())
+  );
+
+  // 4️⃣ Drivers සහ Mechanics වෙන් කරන්න
   if (key === 'drivers') {
     rows = rows.filter(v => String(v.Department || "").trim() === "Transport");
   } else if (key === 'mechanics') {
     rows = rows.filter(v => String(v.Department || "").trim() === "Automobile");
   }
 
-  // ✅ Vehicle Type Filter එක යොදන්න
-  if (key === 'vehicles' && currentVehicleTypeFilter_) {
-    rows = rows.filter(v => {
-      const type = String(v.Type || "").toLowerCase().trim();
-      return currentVehicleTypeFilter_.types.some(t => type.includes(t));
-    });
+  // 5️⃣ License Date Filter (Visualization Cards වලින් click කරද්දී)
+  if (key === 'License' && currentLicenseDateFilter_) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextYear = today.getFullYear() + 1;
+
+    if (currentLicenseDateFilter_.type === 'date') {
+      rows = rows.filter(r => String(r.ToDate).split("T")[0] === currentLicenseDateFilter_.date);
+    } 
+    else if (currentLicenseDateFilter_.type === 'expired') {
+      rows = rows.filter(r => {
+        if (!r.ToDate) return false;
+        const tDate = new Date(r.ToDate);
+        tDate.setHours(0, 0, 0, 0);
+        return tDate < today;
+      });
+    }
+    else if (currentLicenseDateFilter_.type === 'updatedNextYear' || currentLicenseDateFilter_.type === 'remaining') {
+      const allLicenses = cache['License'] || [];
+      const latestMap = {};
+      allLicenses.forEach(r => {
+        if (!r.VehicleID || !r.ToDate) return;
+        if (!latestMap[r.VehicleID] || new Date(r.ToDate) > new Date(latestMap[r.VehicleID].ToDate)) {
+          latestMap[r.VehicleID] = r;
+        }
+      });
+
+      rows = rows.filter(r => {
+        const latest = latestMap[r.VehicleID];
+        const toYear = latest ? new Date(latest.ToDate).getFullYear() : 0;
+
+        if (currentLicenseDateFilter_.type === 'updatedNextYear') {
+          return toYear >= nextYear;
+        } else if (currentLicenseDateFilter_.type === 'remaining') {
+          return toYear < nextYear;
+        }
+        return true;
+      });
+    }
   }
 
-  // ✅ Search Box එකේ Filter එක යොදන්න
-  rows = rows.filter((r) =>
-    JSON.stringify(r).toLowerCase().includes(filterText.toLowerCase())
-  );
+  // ✅ Render
   const tbody = document.getElementById(`tbody-${key}`);
   const colCount = mod.fields.filter((f) => !f.hidden).length + 1;
 
@@ -556,7 +776,7 @@ function paintRows(key, filterText) {
   tbody.innerHTML = rows
     .map(
       (r) => `<tr data-id="${r[mod.idField]}">
-        ${mod.fields.filter((f) => !f.hidden).map((f) => `<td>${statusCell(f, r[f.key])}</td>`).join("")}
+        ${mod.fields.filter((f) => !f.hidden).map((f) => `<td>${statusCell(f, r[f.key], r)}</td>`).join("")}
         <td class="row-actions">
           ${canEdit ? `<button title="Edit" onclick='openForm("${key}", ${JSON.stringify(r).replace(/'/g, "&apos;")})'>✎</button>` : ""}
           ${canDelete ? `<button title="Delete" onclick='removeRow("${key}", "${r[mod.idField]}")'>🗑</button>` : ""}
@@ -565,7 +785,7 @@ function paintRows(key, filterText) {
     )
     .join("");
 
-      // ✅ Highlight කරන්න ඕන Row එක තියෙනවද බලන්න
+  // ✅ Row Highlight (License/Insurance navigation)
   if (pendingHighlightVehicle_ && (key === "License" || key === "Insurance")) {
     const modData = MODULES[key];
     const record = (cache[modData.sheet] || []).find(r => String(r.VehicleID) === String(pendingHighlightVehicle_));
@@ -575,18 +795,37 @@ function paintRows(key, filterText) {
       const tr = tbody.querySelector(`tr[data-id="${rowId}"]`);
       
       if (tr) {
-        tr.classList.add("row-highlight-animation"); // Animation Class එක දාන්න
-        // ඒ පේළියට Scroll කරන්න
+        tr.classList.add("row-highlight-animation");
         setTimeout(() => {
           tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
-        
-        // තත්පර 3කට පස්සේ Animation එක අයින් කරන්න
         setTimeout(() => tr.classList.remove("row-highlight-animation"), 3000);
       }
     }
-    pendingHighlightVehicle_ = null; // වැඩේ ඉවරයි, Variable එක Reset කරන්න
+    pendingHighlightVehicle_ = null;
   }
+
+  // ✅ Column Header Styles Update
+  updateColumnFilterStyles(key);
+}
+
+function updateColumnFilterStyles(tableKey) {
+  const resolvedTarget = moduleTargets[tableKey] || `view-${tableKey}`;
+  const root = document.getElementById(resolvedTarget);
+  if (!root) return;
+
+  // හැම Column Header එකක්ම පරීක්ෂා කරන්න
+  root.querySelectorAll("th[data-col-key]").forEach(th => {
+    const colKey = th.dataset.colKey;
+    const filterKey = `${tableKey}_${colKey}`;
+    
+    // ඒ Column එකට Filter එකක් දාලා තියෙනවා නම් (සහ ඒක හිස් නැත්නම්)
+    if (activeColumnFilters_[filterKey] && activeColumnFilters_[filterKey].length > 0) {
+      th.classList.add("filter-active");
+    } else {
+      th.classList.remove("filter-active");
+    }
+  });
 }
 
 function renderSingleRow(key, row) {
@@ -597,7 +836,7 @@ function renderSingleRow(key, row) {
   const canDelete = !noDeleteTabs.includes(key.toLowerCase());
 
   return `<tr data-id="${row[mod.idField]}">
-    ${mod.fields.filter((f) => !f.hidden).map((f) => `<td>${statusCell(f, row[f.key])}</td>`).join("")}
+    ${mod.fields.filter((f) => !f.hidden).map((f) => `<td>${statusCell(f, row[f.key], row)}</td>`).join("")}
     <td class="row-actions">
       ${canEdit ? `<button title="Edit" onclick='openForm("${key}", ${JSON.stringify(row).replace(/'/g, "&apos;")})'>✎</button>` : ""}
       ${canDelete ? `<button title="Delete" onclick='removeRow("${key}", "${row[mod.idField]}")'>🗑</button>` : ""}
@@ -605,14 +844,56 @@ function renderSingleRow(key, row) {
   </tr>`;
 }
 
-function statusCell(field, value) {
+function statusCell(field, value, row) {
+  // ✅ License & Insurance Expiry දවස් ගාණ Auto Calculate කිරීම
+  if ((field.key === "LicenseExpiry" || field.key === "InsuranceExpiry") && row && row["ToDate"]) {
+    const toDate = new Date(row["ToDate"]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    toDate.setHours(0, 0, 0, 0);
+    
+    const diffDays = Math.round((toDate - today) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return `<span style="color:#dc2626; font-weight:bold;">Expired (${Math.abs(diffDays)}d ago)</span>`;
+    } else if (diffDays === 0) {
+      return `<span style="color:#dc2626; font-weight:bold;">Expires Today</span>`;
+    } else if (diffDays <= 7) {
+      return `<span style="color:#d97706; font-weight:bold;">${diffDays} Days</span>`;
+    } else {
+      return `<span style="color:#16a34a; font-weight:bold;">${diffDays} Days</span>`;
+    }
+  }
+
   if (field.key === "Status" && value) {
     const map = { Active: "badge-green", "In Service": "badge-amber", Inactive: "badge-red" };
     return `<span class="badge ${map[value] || "badge-green"}">${value}</span>`;
   }
+  
   if (field.key === "Cost" && value !== "" && value !== undefined) {
     return formatNumber_(value);
   }
+
+    // ✅ Checkbox Columns (License, Emission, Fitness) සඳහා කොළ පාට
+  if (field.type === "checkbox") {
+    if (value === "Yes" || value === "TRUE" || value === true) {
+      return `<span class="badge badge-green" style="border-radius: 4px; padding: 3px 8px; font-size: 11px;">✔ Yes</span>`;
+    }
+    return `<span style="color:#ccc; font-size:12px;">—</span>`;
+  }
+
+  // ✅ Reminder Columns හිස් නැත්නම් (Email ගිහින් නම්) "Sent" කියලා පෙන්නන්න
+  // (String(field.key).toLowerCase() මගින් "1st reminder" සහ "2nd Reminder" දෙකම අල්ලගන්නවා)
+  if (String(field.key).toLowerCase().includes("reminder")) {
+    if (value && value !== "") {
+      // දිනය විතරක් ගන්නවා (උදා: 2026-11-04)
+      const dateOnly = String(value).split(" ")[0];
+      return `<span class="badge badge-green" title="Sent on: ${value}">✅ Sent ${dateOnly}</span>`;
+    } else {
+      return `<span style="color:#ccc; font-size:12px;">—</span>`;
+    }
+  }
+
   return value ?? "";
 }
 
@@ -626,6 +907,17 @@ const modalTitle = document.getElementById("modalTitle");
 document.getElementById("modalCloseBtn")?.addEventListener("click", closeForm);
 
 async function openForm(key, existing) {
+  // ✅ TripInfo එකට Add කරාම හෝ Edit කරාම අපේ Custom Form එකම එන්න හදමු
+  if (key === "tripInfo") {
+    openTripInfoModal(existing, !!existing); // existing තියෙනවා නම් විතරක් isEdit = true
+    return;
+  }
+    if (key === "mailSettings") {
+    modalForm.style.gridTemplateColumns = "1fr"; // form එක columns 1කට හරවන්න
+  } else {
+    modalForm.style.gridTemplateColumns = "1fr"; // සාමාන්‍යයෙන් එකක් තමයි
+  }
+
   activeModuleKey = key;
   const mod = MODULES[key];
   const singularName = mod.singular || mod.title.slice(0, -1);
@@ -636,32 +928,18 @@ async function openForm(key, existing) {
     modalForm.dataset.defaultDept = mod.defaultDept;
   }
 
-  // ✅ Booking Form එකට Driver Dropdown එක හදන්න
-  if (key === "bookings") {
-    try {
-      const drivers = await Api.list("Drivers");
-      cache.Drivers = drivers;
-      const driverNames = drivers.map(d => d.Name).filter(Boolean);
-      
-      const driverField = mod.fields.find(f => f.key === "Driver Name");
-      if (driverField) {
-        driverField.type = "select";
-        driverField.options = ["", ...driverNames];
-      }
-    } catch (err) {
-      console.warn("Drivers load failed", err);
-    }
-  }
+  // ⬇️ Bookings සඳහා Driver Dropdown එක modal open වුනාට පස්සේ load වෙයි
+  // (await කරන්නේ නෑ — modal එක instant open වෙන්න)
 
   modalForm.innerHTML =
     mod.fields
       .filter((f) => !f.auto)
       .map((f) => {
         // JobCard අලුතෙන් දාද්දී Assigned To හංගන්න
-        if (key === "jobcards" && f.key === "Assigned To" && !existing) return "";
+        if ((key === "jobcards" || key === "jobrequests") && f.key === "Assigned To" && !existing) return "";
         
         // JobCard අලුතෙන් දාද්දී Requested By එකට ලොග් වෙච්ච නම දාන්න
-        if (key === "jobcards" && f.key === "Requested By" && !existing) {
+        if ((key === "jobcards" || key === "jobrequests") && f.key === "Requested By" && !existing) {
           return `<label class="field"><span>${f.label}</span>
             <input name="${f.key}" value="${currentUser.username}" readonly style="background:#f0f0f0; cursor:not-allowed;">
           </label>`;
@@ -680,13 +958,27 @@ async function openForm(key, existing) {
             <input type="date" name="${f.key}" value="${dateVal}" ${f.required ? "required" : ""}>
           </label>`;
         }
+                // ✅ Textarea සඳහා සහාය
+        if (f.type === "textarea") {
+          return `<label class="field" style="grid-column: span 2;"><span>${f.label}</span>
+            <textarea name="${f.key}" rows="8" style="padding:12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:var(--body); resize:vertical;" ${f.required ? "required" : ""}>${val}</textarea>
+          </label>`;
+        }
         if (f.type === "time") {
           return `<label class="field"><span>${f.label}</span>
             <input type="time" name="${f.key}" value="${val}" ${f.required ? "required" : ""}>
           </label>`;
         }
+                // ✅ Checkbox Field එක
+        if (f.type === "checkbox") {
+          const isChecked = (val === "Yes" || val === "TRUE" || val === true) ? "checked" : "";
+          return `<label class="field" style="flex-direction: row; align-items: center; gap: 10px; cursor: pointer; background: #f8faff; padding: 8px 12px; border-radius: 8px; border: 1px solid #dbe4ff;">
+            <input type="checkbox" name="${f.key}" ${isChecked} style="width: 18px; height: 18px; margin: 0; accent-color: var(--steel);">
+            <span style="font-weight: 700; color: var(--navy); font-size: 14px;">${f.label}</span>
+          </label>`;
+        }
         return `<label class="field"><span>${f.label}</span>
-          <input name="${f.key}" value="${val}" ${f.required ? "required" : ""}>
+          <input name="${f.key}" value="${val}" ${f.required ? "required" : ""} ${f.readonly ? "readonly style='background:#f0f0f0; cursor:not-allowed;'" : ""}>
         </label>`;
       })
       .join("") +
@@ -758,7 +1050,190 @@ async function openForm(key, existing) {
     }
   }
 
+  // ✅ Job Requests — වාහනේ අංකය දාද්දී Driver සහ Department Auto-fill වීම
+  if (key === "jobrequests" && !existing) {
+    const vInput = modalForm.querySelector('[name="Vehicle No"]');
+    if (vInput) {
+      vInput.addEventListener("input", (e) => {
+        const vNo = e.target.value.trim().toLowerCase();
+        const vehicles = cache.Vehicles || [];
+        const v = vehicles.find(x => String(x["Vehicle No"] || "").trim().toLowerCase() === vNo);
+        
+        const dInput = modalForm.querySelector('[name="Driver Name"]');
+        const deptInput = modalForm.querySelector('[name="Department"]');
+        
+        if (v) {
+          // Username හෝ User column එකෙන් නම ගන්නවා
+          const dName = v.Username || v.User || "—";
+          const dept = v.Department || "—";
+          if (dInput) dInput.value = dName;
+          if (deptInput) deptInput.value = dept;
+        } else {
+          if (dInput) dInput.value = "";
+          if (deptInput) deptInput.value = "";
+        }
+      });
+    }
+  }
+
   modalBackdrop.classList.add("open");
+
+  // ✅ Bookings — වෙලාවට අනුව Vehicles සහ Drivers පෙන්නන Logic එක
+  if (key === "bookings") {
+    setupBookingAvailabilityLogic_(existing);
+  }
+}
+
+// ✅ Booking Form — වෙලාවට සහ Transport Type එකට අනුව Free Vehicles සහ Drivers පෙන්නන Function එක
+async function setupBookingAvailabilityLogic_(existing) {
+  const form = modalForm;
+  const fromDateInput = form.querySelector('[name="From Date"]');
+  const fromTimeInput = form.querySelector('[name="From Time"]');
+  const toDateInput = form.querySelector('[name="To Date"]');
+  const toTimeInput = form.querySelector('[name="To Time"]');
+  const typeSelect = form.querySelector('[name="Transport Type"]');
+  const vehicleSelect = form.querySelector('[name="Vehicle No"]');
+  const driverSelect = form.querySelector('[name="Driver Name"]');
+
+  if (!fromDateInput || !vehicleSelect || !typeSelect) return;
+
+  // දැනට තියෙන අගයන් (Edit කරද්දී) තියාගන්න
+  const originalVehicle = existing ? existing["Vehicle No"] : "";
+  const originalDriver = existing ? existing["Driver Name"] : "";
+
+  // දත්ත ලෝඩ් වෙනකම් පොඩි ලෝඩින් එකක් පෙන්නන්න
+  vehicleSelect.innerHTML = `<option value="">Loading vehicles...</option>`;
+  if (driverSelect) driverSelect.innerHTML = `<option value="">Loading drivers...</option>`;
+  typeSelect.innerHTML = `<option value="">Loading types...</option>`;
+
+  // දත්ත Cache එකේ නැත්නම් API එකෙන් ගන්න
+  if (!cache.Vehicles || cache.Vehicles.length === 0) {
+    try { cache.Vehicles = await Api.list("Vehicles"); } catch (e) {}
+  }
+  if (!cache.Drivers || cache.Drivers.length === 0) {
+    try { cache.Drivers = await Api.list("Drivers"); } catch (e) {}
+  }
+  if (!cache.Bookings) {
+    try { cache.Bookings = await Api.list("Bookings"); } catch (e) {}
+  }
+
+  // 1. Transport Type Dropdown එක හැදීම (Vehicle Master එකේ Purpose වල Unique අගයන්)
+  const allVehicles = cache.Vehicles || [];
+  const uniquePurposes = [...new Set(allVehicles.map(v => String(v.Purpose || "").trim()).filter(Boolean))].sort();
+  
+  typeSelect.innerHTML = `<option value="">— Select Type —</option>` + 
+    uniquePurposes.map(p => `<option value="${p}">${p}</option>`).join("");
+
+  // Edit කරද්දී අලුතෙන් Type එක Auto-select වීම
+  if (existing && originalVehicle) {
+    const foundV = allVehicles.find(v => String(v["Vehicle No"]).trim() === String(originalVehicle).trim());
+    if (foundV && foundV.Purpose) {
+      typeSelect.value = foundV.Purpose;
+    }
+  }
+
+  // 2. වෙලාව සහ Type එක වෙනස් වෙන හැම වෙලාවකම Dropdown එක Refresh වෙන Function එක
+  const refreshDropdowns = () => {
+    const fDate = fromDateInput.value;
+    const fTime = fromTimeInput.value;
+    const tDate = toDateInput.value;
+    const tTime = toTimeInput.value;
+    const selectedType = typeSelect.value;
+
+    // වෙලාව සම්පූර්ණයෙන්ම දාලා නැත්නම් හෝ Type එක තෝරලා නැත්නම්
+    if (!fDate || !fTime || !tDate || !tTime) {
+      vehicleSelect.innerHTML = `<option value="">Select all dates & times first</option>`;
+      if (driverSelect) driverSelect.innerHTML = `<option value="">Select all dates & times first</option>`;
+      return;
+    }
+
+    if (!selectedType) {
+      vehicleSelect.innerHTML = `<option value="">Select Transport Type first</option>`;
+      if (driverSelect) driverSelect.innerHTML = `<option value="">Select Transport Type first</option>`;
+      return;
+    }
+
+    const newStart = new Date(`${fDate}T${fTime}`);
+    const newEnd = new Date(`${tDate}T${tTime}`);
+
+    if (newStart >= newEnd) {
+      vehicleSelect.innerHTML = `<option value="">Invalid time range</option>`;
+      if (driverSelect) driverSelect.innerHTML = `<option value="">Invalid time range</option>`;
+      return;
+    }
+
+    // මේ වෙලාවට ගැටෙන (Overlap වෙන) Bookings හොයාගන්න
+    const currentBookingId = existing ? existing.ID : null;
+    const bookings = cache.Bookings || [];
+    
+    const busyVehicles = new Set();
+    const busyDrivers = new Set();
+
+    bookings.forEach(b => {
+      if (b.Status === "Rejected") return;
+      if (currentBookingId && String(b.ID) === String(currentBookingId)) return;
+
+      const bStart = new Date(`${b["From Date"]}T${b["From Time"] || "00:00"}`);
+      const bEnd = new Date(`${b["To Date"]}T${b["To Time"] || "23:59"}`);
+
+      if (newStart < bEnd && newEnd > bStart) {
+        if (b["Vehicle No"]) busyVehicles.add(String(b["Vehicle No"]).trim().toUpperCase());
+        if (b["Driver Name"]) busyDrivers.add(String(b["Driver Name"]).trim().toUpperCase());
+      }
+    });
+
+    // 3. Free Vehicles Filter කරගන්න (තෝරපු Type එකට අදාළ වාහන විතරක්)
+    const availableVehicles = allVehicles.filter(v => {
+      const vNo = String(v["Vehicle No"] || "").trim().toUpperCase();
+      const purpose = String(v.Purpose || "").trim().toLowerCase();
+      
+      // තෝරපු Type එකට ගැලපෙනවද බලනවා
+      return vNo && 
+             purpose === selectedType.toLowerCase() && 
+             !busyVehicles.has(vNo);
+    });
+
+    // 4. Free Drivers Filter කරගන්න ("Transport Driver" අය විතරක්)
+    const allDrivers = cache.Drivers || [];
+    const availableDrivers = allDrivers.filter(d => {
+      const dName = String(d.Name || "").trim().toUpperCase();
+      const status = String(d.Status || "Active").trim();
+      const position = String(d.Position || "").trim().toLowerCase(); 
+      
+      return dName && 
+             status === "Active" && 
+             position === "transport driver" && 
+             !busyDrivers.has(dName);
+    });
+
+    // Dropdown වලට දත්ත දාන්න
+    vehicleSelect.innerHTML = `<option value="">— Select Vehicle —</option>` + 
+      availableVehicles.map(v => `<option value="${v["Vehicle No"]}">${v["Vehicle No"]}</option>`).join("");
+      
+    if (driverSelect) {
+      driverSelect.innerHTML = `<option value="">— Select Driver —</option>` + 
+        availableDrivers.map(d => `<option value="${d.Name}">${d.Name}</option>`).join("");
+    }
+
+    // Edit කරද්දී කලින් තිබ්බ අගය තාම Free නම් ඒක ආයේ Select කරන්න
+    if (originalVehicle) {
+      const opt = Array.from(vehicleSelect.options).find(o => o.value === originalVehicle);
+      if (opt) vehicleSelect.value = originalVehicle;
+    }
+    if (originalDriver && driverSelect) {
+      const opt = Array.from(driverSelect.options).find(o => o.value === originalDriver);
+      if (opt) driverSelect.value = originalDriver;
+    }
+  };
+
+  // වෙලාව සහ Type වෙනස් කරන හැම වෙලාවකම Dropdown එක Refresh වෙන්න Event Listeners දාන්න
+  [fromDateInput, fromTimeInput, toDateInput, toTimeInput, typeSelect].forEach(input => {
+    input.addEventListener("change", refreshDropdowns);
+    input.addEventListener("input", refreshDropdowns);
+  });
+
+  // Form එක open වෙනකොටම එක පාරක් Run කරන්න
+  refreshDropdowns();
 }
 
 function closeForm() {
@@ -827,6 +1302,15 @@ modalForm?.addEventListener("submit", async (e) => {
   const formData = new FormData(modalForm);
   const data = Object.fromEntries(formData.entries());
 
+  // ✅ Checkbox වල අගයන් හරියටම ගන්න (Yes හෝ No)
+  mod.fields.filter(f => f.type === "checkbox").forEach(f => {
+    if (formData.has(f.key)) {
+      data[f.key] = "Yes";
+    } else {
+      data[f.key] = "No";
+    }
+  });
+
   const computedField = mod.fields.find((f) => f.computedFrom);
   if (computedField && modalForm.dataset[computedField.key] !== undefined) {
     data[computedField.key] = modalForm.dataset[computedField.key];
@@ -859,9 +1343,14 @@ modalForm?.addEventListener("submit", async (e) => {
       if (activeModuleKey === "bookings") {
         data["Status"] = "Pending";
         data["Approved By"] = "";
+        // ✅ Booking Number Auto Generate කරන්න
+        data["Booking Number"] = generateNextBookingNumber_();
       }
-      if (activeModuleKey === "jobcards") {
-        data["Status"] = "Pending"; // අලුත් ජොබ් හැම වෙලාවෙම Pending වලින් පටන් ගන්න
+            if (activeModuleKey === "jobrequests") {
+        data["Status"] = "Requested"; // ✅ ට්‍රාන්ස්පෝට් එකෙන් එනකොට Requested වෙන්න ඕන
+        data["Accepted By"] = "";
+      } else if (activeModuleKey === "jobcards") {
+        data["Status"] = "Pending"; 
       }
 
       response = await Api.add(mod.sheet, data, username);
@@ -950,6 +1439,25 @@ modalForm?.addEventListener("submit", async (e) => {
           paintRows(key, searchInput ? searchInput.value : "");
         }
       } else {
+        // ✅ NEW: අලුතෙන් දාන Record එකටත් User ගේ නම එකතු කරන්න
+        if (key === "License" || key === "Insurance") {
+          const vehicles = cache.Vehicles || [];
+          const sampleV = vehicles[0] || {};
+          let userKey = null;
+          // ✅ "Username" එක මුලින්ම හොයන්න
+          const possibleKeys = ["Username", "User", "User/Driver", "Driver Name", "User Name", "Driver"];
+          for (const k of possibleKeys) {
+            if (sampleV[k] !== undefined) {
+              userKey = k;
+              break;
+            }
+          }
+
+          const vId = String(data.VehicleID || "").replace(/\s+/g, '').toLowerCase();
+          const found = vehicles.find(x => String(x["Vehicle No"] || "").replace(/\s+/g, '').toLowerCase() === vId);
+          data.User = (found && userKey) ? (String(found[userKey] || "").trim() || "—") : "—";
+        }
+
         cache[mod.sheet].push(data);
         const rowString = JSON.stringify(data).toLowerCase();
         if (rowString.includes(searchTerm)) {
@@ -959,9 +1467,10 @@ modalForm?.addEventListener("submit", async (e) => {
     }
 
     // අනිත් Charts ටික අලුත් කරන්න
-    if (key === "vehicles") renderVehicleStatsCards();
-    if (key === "fuel") renderFuelOverview();
-    if (key === "jobcards") loadJobCardsView();
+if (key === "vehicles") renderVehicleStatsCards();
+if (key === "fuel") renderFuelOverview();
+if (key === "jobcards") loadJobCardsView();
+if (key === "License") renderLicenseVisualization();   // ✅ NEW
   } catch (err) {
     submitBtn.disabled = false;
     submitBtn.textContent = originalText;
@@ -983,7 +1492,8 @@ async function removeRow(key, id) {
     if (rowToRemove) rowToRemove.remove();
 
     if (key === "vehicles") renderVehicleStatsCards();
-    if (key === "fuel") renderFuelOverview();
+if (key === "fuel") renderFuelOverview();
+if (key === "License") renderLicenseVisualization();   // ✅ NEW
   } catch (err) {
     alert("Couldn't delete: " + err.message);
   }
@@ -1120,9 +1630,12 @@ function renderVehicleStatsCards() {
     const inServiceCount = filtered.filter((v) => (v.Status || "").trim() === "In Service").length;
     const inactiveCount = filtered.filter((v) => (v.Status || "").trim() === "Inactive").length;
 
+    const safeKey = cat.key.replace(/'/g, "\\'");
+    const safeTypes = JSON.stringify(cat.types).replace(/"/g, '&quot;');
+
     html += `
       <div class="stat-card accent-${cat.key.toLowerCase().replace(/[^a-z]/g, "")}" 
-           onclick="filterVehiclesByType('${cat.key}', ${JSON.stringify(cat.types).replace(/"/g, '&quot;')})" 
+           onclick="filterVehiclesByType('${safeKey}', ${safeTypes})" 
            style="cursor: pointer;">
         <div class="stat-icon">${getVehicleTypeIcon(cat.key)}</div>
         <div class="stat-content">
@@ -1216,9 +1729,9 @@ function renderFleetFuelCombo_(year, fuelType, monthVal) {
 
   const container = document.getElementById("fleetFuelComboChart");
 
-  if (fuelType === "All") {
-    container.innerHTML = comboChartSvg_(dieselQty, costTotals, labels, "fleetFuelComboSvg", petrolQty, 180);
-    attachComboHover_("fleetFuelComboSvg", dieselQty, costTotals, petrolQty, 180);
+    if (fuelType === "All") {
+    container.innerHTML = comboChartSvg_(dieselQty, costTotals, labels, "fleetFuelComboSvg", petrolQty, 180); // ✅ 180 -> 220
+    attachComboHover_("fleetFuelComboSvg", dieselQty, costTotals, petrolQty, 180); // ✅ 180 -> 220
 
     // ✅ Legend Click Events
     document.querySelectorAll('.interactive-legend .legend-item').forEach(item => {
@@ -1226,7 +1739,6 @@ function renderFleetFuelCombo_(year, fuelType, monthVal) {
         const cat = e.currentTarget.dataset.cat;
         fuelComboVisibility_[cat] = !fuelComboVisibility_[cat];
 
-        // අඩුම තරමින් එකක් හරි පේන්න තියෙන්න ඕන
         if (!fuelComboVisibility_.diesel && !fuelComboVisibility_.petrol && !fuelComboVisibility_.cost) {
            fuelComboVisibility_[cat] = true;
         }
@@ -1236,8 +1748,8 @@ function renderFleetFuelCombo_(year, fuelType, monthVal) {
     });
   } else {
     const qtyTotals = (fuelType === "Diesel") ? dieselQty : petrolQty;
-    container.innerHTML = comboChartSvg_(qtyTotals, costTotals, labels, "fleetFuelComboSvg", undefined, 180);
-    attachComboHover_("fleetFuelComboSvg", qtyTotals, costTotals, undefined, 180);
+    container.innerHTML = comboChartSvg_(qtyTotals, costTotals, labels, "fleetFuelComboSvg", undefined, 180); // ✅ 180 -> 220
+    attachComboHover_("fleetFuelComboSvg", qtyTotals, costTotals, undefined, 180); // ✅ 180 -> 220
   }
 }
 
@@ -2335,14 +2847,13 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
   // 🔹 License ද Insurance ද කියලා අඳුරගන්නවා
   const type = containerId.includes("license") ? "License" : "Insurance";
 
-  const html = withDaysLeft.map((r) => {
+    const html = withDaysLeft.map((r) => {
       const v = vehicles.find((veh) => veh["Vehicle No"] === r.VehicleID) || {};
       
       let badgeClass = "safe";
       let icon = "🟢";
       let daysText = `${r.daysLeft} Days`;
 
-      // ✅ Minus දින සඳහා වෙනම පාටක් දෙන්න
       if (r.daysLeft < 0) {
         badgeClass = "expired";
         icon = "⛔";
@@ -2355,7 +2866,16 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
         icon = "🟡";
       }
 
-      // ✅ Click කළාම අදාළ ටැබ් එකට යන්න Function එක call කරන්න
+      // ✅ Reminder Badges හදන්න (License එකට විතරයි මේ columns තියෙන්නේ)
+      let reminderHtml = "";
+      if (r["1st reminder"] || r["2nd Reminder"] || r["3rd Reminder"]) {
+        reminderHtml = `<div class="reminder-badges" style="margin-top: 4px; display:flex; gap:4px; flex-wrap:wrap;">`;
+        if (r["1st reminder"]) reminderHtml += `<span class="rem-badge sent" title="Sent: ${r["1st reminder"]}">📩 1st</span>`;
+        if (r["2nd Reminder"]) reminderHtml += `<span class="rem-badge sent" title="Sent: ${r["2nd Reminder"]}">📩 2nd</span>`;
+        if (r["3rd Reminder"]) reminderHtml += `<span class="rem-badge sent" title="Sent: ${r["3rd Reminder"]}">📩 3rd</span>`;
+        reminderHtml += `</div>`;
+      }
+
       return `
       <div class="expiring-row" onclick="navigateToExpiringItem('${type}', '${r.VehicleID}')" style="cursor: pointer;" title="Click to view ${type}">
         <div class="exp-left">
@@ -2363,6 +2883,7 @@ function renderExpiringPanel_(rows, vehicles, containerId) {
           <div>
             <div class="exp-vno">${r.VehicleID || "Unknown"}</div>
             <div class="exp-sub">${v.Department || "No Dept"} • ${v.User || "No User"}</div>
+            ${reminderHtml} <!-- ⬅️ මේක අලුතෙන් එකතු කළා -->
           </div>
         </div>
         <div class="exp-right">
@@ -2511,16 +3032,217 @@ function renderMaintenanceGroup() {
 
 function renderLicenseInsuranceGroup() {
   const subtabs = document.querySelectorAll("#licenseInsuranceSubtabs .subtab-btn");
-  subtabs.forEach((btn) => {
-    btn.onclick = () => {
-      subtabs.forEach((b) => b.classList.toggle("active", b === btn));
-      renderModule(btn.dataset.submodule, "licenseInsuranceContent");
-    };
-  });
+  const viz = document.getElementById("licenseVisualization");
+
+  const handleSwitch = async (btn) => {
+    subtabs.forEach((b) => b.classList.toggle("active", b === btn));
+    const submodule = btn.dataset.submodule;
+
+      if (submodule === "License") {
+        if (viz) viz.style.display = "block";
+        await renderModule(submodule, "licenseInsuranceContent");
+        await renderLicenseVisualization();  // ✅ await කළා
+      } else {
+      if (viz) viz.style.display = "none";
+      await renderModule(submodule, "licenseInsuranceContent");
+    }
+  };
+
+  subtabs.forEach((btn) => { btn.onclick = () => handleSwitch(btn); });
+
   const activeBtn = document.querySelector("#licenseInsuranceSubtabs .subtab-btn.active") || subtabs[0];
-  renderModule(activeBtn.dataset.submodule, "licenseInsuranceContent");
+  handleSwitch(activeBtn);
 }
 
+// ✅ Helper: Date object එකක් "YYYY-MM-DD" string එකකට හරවන්න
+function formatDateStr_(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// ============================================
+// LICENSE VISUALIZATION (Cards + 7-Day + Expired)
+// ============================================
+
+async function renderLicenseVisualization() {
+  const container = document.getElementById("licenseVisualization");
+  if (!container) return;
+
+  // ✅ Vehicles data එක cache එකේ නැත්නම් API එකෙන් ගන්න
+  if (!cache.Vehicles || cache.Vehicles.length === 0) {
+    try {
+      cache.Vehicles = await Api.list("Vehicles");
+    } catch (err) {
+      console.warn("Vehicles load failed for visualization", err);
+    }
+  }
+
+  // ✅ License data එකත් නැත්නම් ගන්න
+  if (!cache.License) {
+    try {
+      cache.License = await Api.list("License");
+    } catch (err) {
+      console.warn("License load failed for visualization", err);
+    }
+  }
+
+  const licenseRows = cache.License || [];
+  const vehicles = cache.Vehicles || [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // ===== Card 1: Total vehicles =====
+  const totalVehicles = vehicles.length;
+
+  // ===== Latest record per vehicle (by ToDate) =====
+  const latestByVehicle = {};
+  licenseRows.forEach(r => {
+    if (!r.VehicleID || !r.ToDate) return;
+    const existing = latestByVehicle[r.VehicleID];
+    if (!existing || new Date(r.ToDate) > new Date(existing.ToDate)) {
+      latestByVehicle[r.VehicleID] = r;
+    }
+  });
+
+  // ===== Card 2: Updated for Next Year (උදා: 2027) =====
+  const currentYear = new Date().getFullYear();
+  const nextYear = currentYear + 1;
+
+  const updatedNextYearCount = Object.values(latestByVehicle).filter(r => {
+    const toYear = new Date(r.ToDate).getFullYear();
+    return toYear >= nextYear;
+  }).length;
+
+  // ===== Card 3: Remaining = Total - Updated Next Year =====
+  const remainingCount = Math.max(totalVehicles - updatedNextYearCount, 0);
+
+  // ===== Next 7 days =====
+  const next7Days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const dateStr = formatDateStr_(d);
+    const vehiclesThatDay = Object.values(latestByVehicle).filter(r => {
+      return String(r.ToDate).split("T")[0] === dateStr;
+    });
+    next7Days.push({ day: i + 1, date: dateStr, vehicles: vehiclesThatDay });
+  }
+  const next7Total = next7Days.reduce((sum, d) => sum + d.vehicles.length, 0);
+
+  // ===== Expired =====
+  const expiredVehicles = Object.values(latestByVehicle).filter(r => {
+    const toDate = new Date(r.ToDate);
+    toDate.setHours(0, 0, 0, 0);
+    return toDate < today;
+  }).sort((a, b) => new Date(a.ToDate) - new Date(b.ToDate));
+
+  // ===== Build day numbers HTML =====
+  const dayNumbersHtml = next7Days.map(d => {
+    const hasVehicles = d.vehicles.length > 0;
+    const isActive = currentLicenseDateFilter_?.type === 'date' && currentLicenseDateFilter_.date === d.date;
+    
+    return `<span class="day-num ${hasVehicles ? "has-vehicles" : ""} ${d.day === 1 ? "today" : ""} ${isActive ? "active-filter" : ""}" 
+                  onclick="filterLicenseByDate('${d.date}')" title="Click to filter">
+      0${d.day}
+    </span>`;
+  }).join("");
+
+  // ===== Render =====
+  container.innerHTML = `
+    <div class="license-visualization">
+      <div class="license-viz-card card-total ${currentLicenseDateFilter_ === null ? 'active-filter' : ''}" 
+           onclick="filterLicenseByCard('total')" style="cursor:pointer;" title="Click to show all">
+        <div class="viz-card-title">🚗 Total Vehicles</div>
+        <div class="viz-card-count">${totalVehicles}</div>
+        <div class="viz-card-sub">Fleet size</div>
+      </div>
+
+      <div class="license-viz-card card-updated ${currentLicenseDateFilter_?.type === 'updatedNextYear' ? 'active-filter' : ''}" 
+           onclick="filterLicenseByCard('updatedNextYear')" style="cursor:pointer;" title="Click to filter updated">
+        <div class="viz-card-title">✅ Updated (${nextYear})</div>
+        <div class="viz-card-count">${updatedNextYearCount}</div>
+        <div class="viz-card-sub">Renewed to ${nextYear}</div>
+      </div>
+
+      <div class="license-viz-card card-remaining ${currentLicenseDateFilter_?.type === 'remaining' ? 'active-filter' : ''}" 
+           onclick="filterLicenseByCard('remaining')" style="cursor:pointer;" title="Click to filter remaining">
+        <div class="viz-card-title">⏳ Remaining</div>
+        <div class="viz-card-count">${remainingCount}</div>
+        <div class="viz-card-sub">Still to update</div>
+      </div>
+
+      <div class="license-viz-card card-7days">
+        <div class="viz-card-title">📅 Expiring in Next 7 Days</div>
+        <div class="viz-card-count">${next7Total}</div>
+        <div class="day-numbers-row">${dayNumbersHtml}</div>
+      </div>
+
+            <div class="license-viz-card card-expired ${currentLicenseDateFilter_?.type === 'expired' ? 'active-filter' : ''}" 
+           onclick="filterLicenseByExpired()" style="cursor:pointer;" title="Click to filter expired">
+        <div class="viz-card-title">🔴 Expired</div>
+        <div class="viz-card-count">${expiredVehicles.length}</div>
+        <div class="expired-hint">Click to view list →</div>
+      </div>
+    </div>
+  `;
+}
+
+// ✅ Click කරාම Table එක Filter වෙන Functions
+function filterLicenseByDate(dateStr) {
+  // ආයේ ඒ Card එකම Click කළොත් Filter එක අයින් වෙන්න
+  if (currentLicenseDateFilter_?.type === 'date' && currentLicenseDateFilter_.date === dateStr) {
+    currentLicenseDateFilter_ = null;
+  } else {
+    currentLicenseDateFilter_ = { type: 'date', date: dateStr };
+  }
+  
+  applyLicenseFilter_();
+}
+
+function filterLicenseByExpired() {
+  // ආයේ Click කළොත් Filter එක අයින් වෙන්න
+  if (currentLicenseDateFilter_?.type === 'expired') {
+    currentLicenseDateFilter_ = null;
+  } else {
+    currentLicenseDateFilter_ = { type: 'expired' };
+  }
+  
+  applyLicenseFilter_();
+}
+
+// ✅ මුල් Cards 3ට Click කරාම වැඩ කරන Function එක
+function filterLicenseByCard(type) {
+  if (type === 'total') {
+    currentLicenseDateFilter_ = null; // Total එක Click කරාම ඔක්කොම පෙන්නන්න
+  } else {
+    // ආයේ ඒකම Click කළොත් Filter එක අයින් වෙන්න
+    if (currentLicenseDateFilter_?.type === type) {
+      currentLicenseDateFilter_ = null;
+    } else {
+      currentLicenseDateFilter_ = { type: type };
+    }
+  }
+  
+  applyLicenseFilter_();
+}
+
+// ✅ Filter එක Apply කරලා Table එක අලුත් කරන Helper එක
+function applyLicenseFilter_() {
+  // Reset Button එක පෙන්නන්න / හංගන්න
+  const resetBtn = document.getElementById("resetLicenseFilterBtn");
+  if (resetBtn) {
+    resetBtn.style.display = currentLicenseDateFilter_ ? 'block' : 'none';
+  }
+
+  // Cards වල පාට වෙනස් කරන්න ආයේ Render කරන්න
+  renderLicenseVisualization();
+
+  // Table එක අලුත් කරන්න
+  const searchInput = document.getElementById('search-License');
+  paintRows('License', searchInput ? searchInput.value : "");
+}
 
 // ===================================================================
 // 17. CHART ZOOM
@@ -2567,12 +3289,12 @@ async function renderFuelOverview() {
   });
 
   const categories = [
-    { label: "Bikes", icon: "🏍️", types: ["bike"] },
-    { label: "Light", icon: "🚗", types: ["car", "jeep", "cab", "suv"] },
-    { label: "Vans & Bus", icon: "🚐", types: ["van", "bus"] },
-    { label: "Lorry", icon: "🚛", types: ["lorry", "truck"] },
-    { label: "Land", icon: "🚜", types: ["tractor", "excavator", "jcb", "backhoe"] },
-  ];
+  { label: "Bikes", icon: "🏍️", types: ["cycle"] },   // ✅ FIX: bike → cycle
+  { label: "Light", icon: "🚗", types: ["car", "jeep", "cab", "suv"] },
+  { label: "Vans & Bus", icon: "🚐", types: ["van", "bus"] },
+  { label: "Lorry", icon: "🚛", types: ["lorry", "truck"] },
+  { label: "Land", icon: "🚜", types: ["tractor", "excavator", "jcb", "backhoe"] },
+];
 
   const vehicleTypeMap = {};
   vehicles.forEach((v) => { vehicleTypeMap[String(v["Vehicle No"]).trim()] = (v.Type || "").toLowerCase().trim(); });
@@ -2873,13 +3595,18 @@ async function renderSettingsView_() {
 const SETTINGS_TABS_ = [
   { key: "dashboard", label: "Dashboard", icon: "📊" },
   { key: "vehicles", label: "Vehicle Master", icon: "🚗" },
-  { key: "drivers", label: "User Master", icon: "👨‍✈️" },
+  { key: "employees", label: "User Master", icon: "👨‍✈️" },
   { key: "fuel", label: "Fuel", icon: "⛽" },
   { key: "Lubricant", label: "Lubricant", icon: "🛢️" },
   { key: "maintenance", label: "Service & Maint.", icon: "🔧" },
   { key: "licenseInsurance", label: "License & Ins.", icon: "🛡️" },
   { key: "Accident", label: "Accident", icon: "⚠️" },
   { key: "tracking", label: "Tracking", icon: "📍" },
+  { key: "bookings", label: "Vehicle Booking", icon: "📅" },   // ✅ NEW
+  { key: "jobcards", label: "Workshop Jobs", icon: "🛠️" },     // ✅ NEW
+  { key: "attendance", label: "Attendance", icon: "⏱️" }, 
+  { key: "tripInfo", label: "Trip Info", icon: "🛣️" },     // ✅ NEW
+  { key: "jobrequests", label: "Job Request", icon: "📝" },
 ];
 
 function paintUsersList_(filterText) {
@@ -2905,16 +3632,15 @@ function paintUsersList_(filterText) {
     const origUser = usersCache_.find((x) => String(x.ID ?? x.Id ?? x.id) === String(id));
 
     const pwdInput = card.querySelector(".pwd-input");
-    pwdInput.addEventListener("input", () => {
-      const origPwd = origUser ? origUser.Password || "" : "";
-      if (pwdInput.value !== origPwd) {
-        setPending_(id, "Password", pwdInput.value);
-        card.classList.add("user-changed");
-      } else {
-        clearPending_(id, "Password");
-        checkCardChanged_(card, id);
-      }
-    });
+pwdInput.addEventListener("input", () => {
+  if (pwdInput.value.trim() !== "") {
+    setPending_(id, "Password", pwdInput.value);
+    card.classList.add("user-changed");
+  } else {
+    clearPending_(id, "Password");
+    checkCardChanged_(card, id);
+  }
+});
 
     card.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
       cb.addEventListener("change", () => {
@@ -2939,7 +3665,8 @@ function paintUsersList_(filterText) {
 
 function renderUserCard_(u) {
   const id = u.ID ?? u.Id ?? u.id;
-  const pwd = pendingChanges_[id]?.Password ?? (u.Password || "");
+  // ✅ Password එක නොපෙන්නන්න — pending වුනොත් විතරක් පෙන්නන්න
+  const pwd = pendingChanges_[id]?.Password ?? "";
   const isAdmin = String(u.Role || "").toLowerCase() === "admin";
 
   const allowedArr = String(u.AllowedTabs || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -2969,7 +3696,7 @@ function renderUserCard_(u) {
         </div>
         <label class="user-pwd-field">
           <span>🔑 Password</span>
-          <input type="text" class="pwd-input" value="${pwd}" placeholder="Password">
+          <input type="text" class="pwd-input" value="${pwd}" placeholder="••••••• (unchanged)">
         </label>
       </div>
       <div class="perm-section">
@@ -3041,15 +3768,18 @@ async function saveUserChanges_() {
     if (!original) { fail++; continue; }
 
     const changes = pendingChanges_[id];
-    const payload = {
-      ID: original.ID ?? original.Id ?? original.id,
-      Username: original.Username,
-      Password: changes.Password !== undefined ? changes.Password : original.Password || "",
-      Role: original.Role || "Staff",
-      AllowedTabs: changes.AllowedTabs !== undefined ? changes.AllowedTabs : original.AllowedTabs || "",
-      NoEditTabs: changes.NoEditTabs !== undefined ? changes.NoEditTabs : original.NoEditTabs || "",
-      NoDeleteTabs: changes.NoDeleteTabs !== undefined ? changes.NoDeleteTabs : original.NoDeleteTabs || "",
-    };
+const payload = {
+  ID: original.ID ?? original.Id ?? original.id,
+  Username: original.Username,
+  Role: original.Role || "Staff",
+  AllowedTabs: changes.AllowedTabs !== undefined ? changes.AllowedTabs : original.AllowedTabs || "",
+  NoEditTabs: changes.NoEditTabs !== undefined ? changes.NoEditTabs : original.NoEditTabs || "",
+  NoDeleteTabs: changes.NoDeleteTabs !== undefined ? changes.NoDeleteTabs : original.NoDeleteTabs || "",
+};
+// ✅ Password වෙනස් වුනොත් විතරක් යවන්න
+if (changes.Password !== undefined && changes.Password !== "") {
+  payload.Password = changes.Password;
+}
 
     try {
       await Api.update("Users", payload, currentUser.username);
@@ -3292,12 +4022,32 @@ function loadBookingsForDate(dateStr) {
       return timeStr; // අවසාන වශයෙන් එහෙම්මම යවන්න
     };
 
-    return `
-      <div class="booking-item">
-        <div class="booking-item-header">
-          <span class="booking-vehicle">${b["Vehicle No"]}</span>
-          <span class="booking-time-pill">🕒 ${formatTime(b["From Time"])} - ${formatTime(b["To Time"])}</span>
+      // Edit කරද්දී JSON එක හරියට pass වෙන්න හදාගන්නවා
+  const bJson = JSON.stringify(b).replace(/'/g, "&apos;");
+
+  return `
+    <div class="booking-item" data-booking-id="${b.ID}">
+      <div class="booking-item-header" style="align-items: flex-start;">
+        <!-- ✅ Vehicle No එකට යටින් Booking Number එක පෙන්නන්න -->
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="booking-vehicle" style="font-size: 15px;">${b["Vehicle No"]}</span>
+          ${b["Booking Number"] ? `<span style="font-size: 10.5px; font-family: var(--mono); color: var(--muted); font-weight: 700;">${b["Booking Number"]}</span>` : ''}
         </div>
+        
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="booking-time-pill">🕒 ${formatTime(b["From Time"])} - ${formatTime(b["To Time"])}</span>
+          
+          <!-- ✅ Edit සහ Delete බටන් -->
+          <button onclick='openForm("bookings", ${bJson})' title="Edit Booking" 
+                  style="background:none; border:none; cursor:pointer; font-size:14px; color:#3B82F6; padding:0;">
+            ✎
+          </button>
+          <button onclick="deleteBooking('${b.ID}')" title="Delete Booking" 
+                  style="background:none; border:none; cursor:pointer; font-size:14px; color:#EF4444; padding:0;">
+            🗑
+          </button>
+        </div>
+      </div>
         
         <div class="booking-details-grid">
           <span>Driver:</span> <span><b>${b["Driver Name"] || "Not Assigned"}</b></span>
@@ -3308,18 +4058,27 @@ function loadBookingsForDate(dateStr) {
 
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span class="booking-status-badge ${statusClass}">${b.Status}</span>
-          ${b["Approved By"] ? `<span style="font-size:10px; color:#999;">By: ${b["Approved By"]}</span>` : ""}
+          ${b["Approved By"] ? `<span style="font-size:10px; color:var(--muted);">By: ${b["Approved By"]}</span>` : ""}
         </div>
 
-        ${showActions ? `
-          <div class="booking-actions">
-            <button class="btn-approve" onclick="updateBookingStatus('${b.ID}', 'Approved')">Approve</button>
-            <button class="btn-reject" onclick="updateBookingStatus('${b.ID}', 'Rejected')">Reject</button>
-          </div>
-        ` : ""}
-      </div>
-    `;
-  }).join("");
+              ${showActions ? `
+        <div class="booking-actions">
+          <button class="btn-approve" onclick="updateBookingStatus('${b.ID}', 'Approved')">Approve</button>
+          <button class="btn-reject" onclick="updateBookingStatus('${b.ID}', 'Rejected')">Reject</button>
+        </div>
+      ` : ""}
+
+      <!-- ✅ NEW: Approved වුනාම විතරක් පේන බටන් එක -->
+      ${b.Status === "Approved" ? `
+        <div class="booking-actions" style="margin-top: 10px;">
+          <button class="btn-trip-info" onclick='openTripInfoModal(${JSON.stringify(b).replace(/'/g, "&apos;")})'>
+            🚗 Update Trip Information
+          </button>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}).join("");
 }
 
 async function updateBookingStatus(id, newStatus) {
@@ -3341,13 +4100,330 @@ async function updateBookingStatus(id, newStatus) {
     
     // Refresh the detail list (using the currently selected date)
     const titleText = document.getElementById("selectedDateTitle").textContent;
-    const dateStr = titleText.replace("Bookings for ", "");
+    const dateStr = titleText.replace("Bookings: ", "");
     loadBookingsForDate(dateStr);
     
   } catch (err) {
     alert("Couldn't update status: " + err.message);
   }
 }
+
+// ✅ Booking එකක් Delete කරන Function එක
+async function deleteBooking(id) {
+  if (!confirm("Are you sure you want to delete this booking?")) return;
+  
+  const booking = cache.Bookings.find(b => String(b.ID) === String(id));
+  if (!booking) return;
+
+  try {
+    // 1. API එකට කියලා Delete කරනවා
+    await Api.remove("Bookings", id);
+    
+    // 2. Cache එකෙන් අයින් කරනවා
+    cache.Bookings = cache.Bookings.filter(b => String(b.ID) !== String(id));
+    
+    // 3. UI එකේ තියෙන කොටුව (Card) එක අයින් කරනවා
+    const el = document.querySelector(`.booking-item[data-booking-id="${id}"]`);
+    if (el) el.remove();
+    
+    // 4. Calendar එකේ අදාළ දවස් වල events update කරනවා
+    const fromDate = new Date(booking["From Date"]);
+    const toDate = new Date(booking["To Date"]);
+    for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+      updateCalendarEventForDate_(formatDateStr_(d));
+    }
+  } catch (err) {
+    alert("Failed to delete booking: " + err.message);
+  }
+}
+
+// ✅ 1. අලුත් Booking එකකට Booking Number හදන Function එක
+function generateNextBookingNumber_() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `BK-${yyyy}-${mm}-`;
+  const bookings = cache.Bookings || [];
+  
+  let maxSeq = 0;
+  bookings.forEach(b => {
+    const bNum = String(b["Booking Number"] || "");
+    if (bNum.startsWith(prefix)) {
+      const seq = parseInt(bNum.replace(prefix, ""), 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return prefix + String(maxSeq + 1).padStart(3, '0');
+}
+
+// ✅ 2. අලුත් Trip එකකට Trip Number හදන Function එක
+async function generateNextTripNumber_() {
+  if (!cache.TripInfo) {
+    try { cache.TripInfo = await Api.list("TripInfo"); } catch (e) { cache.TripInfo = []; }
+  }
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `TRP-${yyyy}-${mm}-`;
+  const trips = cache.TripInfo || [];
+  
+  let maxSeq = 0;
+  trips.forEach(t => {
+    const tNum = String(t["Trip Number"] || "");
+    if (tNum.startsWith(prefix)) {
+      const seq = parseInt(tNum.replace(prefix, ""), 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return prefix + String(maxSeq + 1).padStart(3, '0');
+}
+
+// ✅ Trip Info Modal එක ඕපන් කරන සහ Form එක හදන Function එක
+async function openTripInfoModal(data, isEdit = false) {
+  document.getElementById("tripInfoModalBackdrop").classList.add("open");
+  const modalBody = document.getElementById("tripInfoModalBody");
+  const modalTitle = document.getElementById("tripInfoModalTitle");
+
+  // මේක Emergency එකකට දානවද? (data නැත්නම් ඒක Emergency)
+  const isEmergency = !data;
+
+  let tripNo, bId, bNum, tripDate, tripType, vNo, dName;
+
+  if (isEdit) {
+    // ✅ Edit කරද්දී පරණ දත්ත පෙන්නන්න
+    modalTitle.textContent = `Edit Trip: ${data["Trip Number"]}`;
+    tripNo = data["Trip Number"];
+    bId = data["BookingID"];
+    bNum = data["Booking Number"];
+    tripDate = data["Date"];
+    tripType = data["Trip Type"];
+    vNo = data["Vehicle Number"];
+    dName = data["Driver Name"];
+  } else if (!isEmergency) {
+    // ✅ Booking එකකින් එනකොට
+    modalTitle.textContent = `Update Trip: ${data["Vehicle No"]}`;
+    modalBody.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">Generating Trip Number...</div>`;
+    
+    tripNo = await generateNextTripNumber_();
+    bId = data.ID;
+    bNum = data["Booking Number"] || "";
+    tripDate = data["From Date"] || todayISO_();
+    tripType = data["Transport Type"] || "";
+    vNo = data["Vehicle No"] || "";
+    dName = data["Driver Name"] || "";
+  } else {
+    // ✅ අලුතෙන් (Emergency) හදද්දී
+    modalTitle.textContent = `Add Emergency Trip`;
+    modalBody.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">Generating Trip Number...</div>`;
+    
+    tripNo = await generateNextTripNumber_();
+    bId = "";
+    bNum = "— Emergency —";
+    tripDate = todayISO_();
+    tripType = "";
+    vNo = "";
+    dName = "";
+
+    // Dropdown වලට දත්ත ලෝඩ් කරගන්න
+    if (!cache.Vehicles || cache.Vehicles.length === 0) {
+      try { cache.Vehicles = await Api.list("Vehicles"); } catch (e) {}
+    }
+    if (!cache.Drivers || cache.Drivers.length === 0) {
+      try { cache.Drivers = await Api.list("Drivers"); } catch (e) {}
+    }
+  }
+
+  // Vehicle සහ Driver Inputs හදන විදිය (Emergency නම් Dropdown, නැත්නම් Readonly Text)
+  let vehicleHtml = `<input type="text" name="Vehicle Number" required value="${vNo}" readonly style="background:#f0f0f0;">`;
+  let driverHtml = `<input type="text" name="Driver Name" value="${dName}" readonly style="background:#f0f0f0;">`;
+
+  if (isEmergency) {
+    vehicleHtml = `<select name="Vehicle Number" required style="padding:9px 11px; border:1px solid var(--line); border-radius:8px; font-size:14px;">
+      <option value="">— Select Vehicle —</option>
+      ${cache.Vehicles.map(v => `<option value="${v['Vehicle No']}">${v['Vehicle No']}</option>`).join('')}
+    </select>`;
+
+    const availableDrivers = cache.Drivers.filter(d => String(d.Status).trim() === "Active");
+    driverHtml = `<select name="Driver Name" style="padding:9px 11px; border:1px solid var(--line); border-radius:8px; font-size:14px;">
+      <option value="">— Select Driver —</option>
+      ${availableDrivers.map(d => `<option value="${d.Name}">${d.Name}</option>`).join('')}
+    </select>`;
+  }
+
+  // Form එකේ HTML එක
+  modalBody.innerHTML = `
+    <form id="tripInfoForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <input type="hidden" name="ID" value="${isEdit ? data.ID : ""}">
+      <input type="hidden" name="BookingID" value="${bId}">
+      
+      <label class="field">
+        <span>Booking Number</span>
+        <input type="text" name="Booking Number" value="${bNum}" readonly style="background:#f0f0f0; font-weight:bold; color:var(--steel);">
+      </label>
+
+      <label class="field">
+        <span>Trip Number</span>
+        <input type="text" name="Trip Number" value="${tripNo}" readonly style="background:#f0f0f0; font-weight:bold; color:var(--steel);">
+      </label>
+
+      <label class="field">
+        <span>Date *</span>
+        <input type="date" name="Date" required value="${tripDate}">
+      </label>
+
+      <label class="field">
+        <span>Trip Type</span>
+        <input type="text" name="Trip Type" value="${tripType}" placeholder="e.g. Delivery">
+      </label>
+
+      <label class="field">
+        <span>Vehicle Number *</span>
+        ${vehicleHtml}
+      </label>
+
+      <label class="field">
+        <span>Driver Name</span>
+        ${driverHtml}
+      </label>
+
+      <label class="field">
+        <span>Helper Name</span>
+        <input type="text" name="Helper Name" value="${isEdit ? (data["Helper Name"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Load Weight</span>
+        <input type="text" name="Load Weight" value="${isEdit ? (data["Load Weight"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>Location & Route</span>
+        <input type="text" name="Location & Route" value="${isEdit ? (data["Location & Route"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Out Time</span>
+        <input type="time" name="Out Time" value="${isEdit ? (data["Out Time"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>In Time</span>
+        <input type="time" name="In Time" value="${isEdit ? (data["In Time"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Odometer Start</span>
+        <input type="number" name="Odometer Start" id="odoStart" value="${isEdit ? (data["Odometer Start"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Odometer End</span>
+        <input type="number" name="Odometer End" id="odoEnd" value="${isEdit ? (data["Odometer End"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Total Trip (Km)</span>
+        <input type="number" name="Total Trip (Km)" id="totalTrip" readonly style="background:#eef1f7; font-weight:bold;" value="${isEdit ? (data["Total Trip (Km)"] || "") : ""}">
+      </label>
+
+      <label class="field">
+        <span>Fuel Quantity</span>
+        <input type="text" name="Fuel Quantity" value="${isEdit ? (data["Fuel Quantity"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>Fuel Receipt No</span>
+        <input type="text" name="Fuel Receipt No" value="${isEdit ? (data["Fuel Receipt No"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>Inspected By</span>
+        <input type="text" name="Inspected" value="${isEdit ? (data["Inspected"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>External damage</span>
+        <input type="text" name="External damage" value="${isEdit ? (data["External damage"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>Mechanical defects</span>
+        <input type="text" name="Mechanical defects" value="${isEdit ? (data["Mechanical defects"] || "") : ""}">
+      </label>
+
+      <label class="field" style="grid-column: span 2;">
+        <span>Accidents</span>
+        <input type="text" name="Accidents" value="${isEdit ? (data["Accidents"] || "") : ""}">
+      </label>
+
+      <div style="grid-column: span 2; display: flex; gap: 10px; margin-top: 10px;">
+        <button type="button" class="btn" style="flex:1; background:#eef1f7; color:#333;" onclick="document.getElementById('tripInfoModalBackdrop').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex:2;" id="saveTripInfoBtn">Save Trip Info</button>
+      </div>
+    </form>
+  `;
+
+  // ✅ Odometer Auto Calculation Logic
+  const odoStart = document.getElementById("odoStart");
+  const odoEnd = document.getElementById("odoEnd");
+  const totalTrip = document.getElementById("totalTrip");
+  
+  const calcKm = () => {
+    if (odoStart.value && odoEnd.value) {
+      const dist = Number(odoEnd.value) - Number(odoStart.value);
+      totalTrip.value = dist > 0 ? dist : 0;
+    } else {
+      totalTrip.value = "";
+    }
+  };
+  odoStart.addEventListener("input", calcKm);
+  odoEnd.addEventListener("input", calcKm);
+  calcKm();
+
+  // ✅ Submit කරන Logic එක
+  document.getElementById("tripInfoForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("saveTripInfoBtn");
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+
+    const formData = new FormData(e.target);
+    const submitData = Object.fromEntries(formData.entries());
+
+    try {
+      if (isEdit) {
+        await Api.update("TripInfo", submitData, currentUser.username);
+        alert("✅ Trip Information updated successfully!");
+      } else {
+        await Api.add("TripInfo", submitData, currentUser.username);
+        alert("✅ Trip Information saved successfully!");
+      }
+      
+      document.getElementById("tripInfoModalBackdrop").classList.remove("open");
+      
+      // Table එක refresh වෙන්න
+      if (document.getElementById("view-tripInfo").classList.contains("active")) {
+        renderModule("tripInfo"); 
+      }
+    } catch (err) {
+      alert("❌ Failed to save: " + err.message);
+      btn.disabled = false;
+      btn.textContent = "Save Trip Info";
+    }
+  });
+}
+
+// ✅ Modal එක වහන එක (Close Button එකට)
+document.addEventListener("DOMContentLoaded", () => {
+  const closeBtn = document.getElementById("tripInfoModalCloseBtn");
+  const backdrop = document.getElementById("tripInfoModalBackdrop");
+  
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      backdrop.classList.remove("open");
+    });
+  }
+});
 
 // Filter වලට Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
@@ -3529,19 +4605,22 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function filterVehiclesByType(categoryKey, typesArray) {
-  // ආයේ ඒ කාඩ්පතම click කළොත් filter එක අයින් වෙන්න
+  // ✅ typesArray එක array එකක්ද කියලා චෙක් කරන්න
+  if (typeof typesArray === 'string') {
+    try { typesArray = JSON.parse(typesArray); } catch(e) { typesArray = []; }
+  }
+
   if (currentVehicleTypeFilter_ && currentVehicleTypeFilter_.key === categoryKey) {
     currentVehicleTypeFilter_ = null;
   } else {
     currentVehicleTypeFilter_ = { key: categoryKey, types: typesArray };
   }
 
-  // කාඩ්පත් වල පාට වෙනස් කිරීම (Active/Inactive)
+  // කාඩ් එකේ පාට වෙනස් කිරීම
   document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
   const resetBtn = document.getElementById("resetVehicleFilterBtn");
 
   if (currentVehicleTypeFilter_) {
-    // අදාළ කාඩ්පත highlight කරන්න
     const activeCard = document.querySelector(`.stat-card.accent-${categoryKey.toLowerCase().replace(/[^a-z]/g, '')}`);
     if (activeCard) activeCard.classList.add('active-filter');
     if (resetBtn) resetBtn.style.display = 'block';
@@ -3549,7 +4628,6 @@ function filterVehiclesByType(categoryKey, typesArray) {
     if (resetBtn) resetBtn.style.display = 'none';
   }
 
-  // Table එක අලුත් කරන්න
   const searchInput = document.getElementById('search-vehicles');
   paintRows('vehicles', searchInput ? searchInput.value : "");
 }
@@ -3566,6 +4644,9 @@ async function loadJobCardsView() {
   try {
     const jobs = await Api.list("JobCards");
     cache.JobCards = jobs;
+
+    // ✅ Badge එක Update කරන්න
+    updateJobNotifBadge();
 
     // Group by Status
     const pending = jobs.filter(j => !j.Status || j.Status === "Pending");
@@ -3588,12 +4669,11 @@ function renderKanbanColumn_(title, type, items) {
     const jobNo = String(job.ID).startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
 
     let actions = "";
-    if (type === "pending") {
-      actions = `
-        <button class="btn-edit-job" onclick='openForm("jobcards", ${JSON.stringify(job).replace(/'/g, "&apos;")})'>✎ Edit</button>
-        <button class="btn-start" onclick="moveJobStatus('${job.ID}', 'In Progress')">▶ Start</button>
-      `;
-    } else if (type === "progress") {
+      if (type === "pending") {
+    actions = `
+      <button class="btn-start" onclick="openStartJobModal('${job.ID}')" style="flex: 1;">▶ Start</button>
+    `;
+  }  else if (type === "progress") {
       // In Progress: Print, Edit, Complete
       actions = `
         <button class="btn-edit-job" onclick='openForm("jobcards", ${JSON.stringify(job).replace(/'/g, "&apos;")})'>✎ Edit</button>
@@ -3687,24 +4767,250 @@ function renderKanbanColumn_(title, type, items) {
   `;
 }
 
-async function moveJobStatus(id, newStatus) {
-  if (newStatus === "Completed") {
-    // Complete කරද්දී Modal එක open කරන්න
-    openCompleteJobModal(id);
+// ✅ 1. Start බටන් එක ඔබද්දී Form එක ඕපන් කරන Function එක
+function openStartJobModal(id) {
+  const job = cache.JobCards.find(j => String(j.ID) === String(id));
+  if (!job) return;
+  
+  document.getElementById("startJobNo").textContent = job.ID.startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
+  document.getElementById("startJobMechanic").value = job["Assigned To"] || "";
+  document.getElementById("startJobModal").classList.add("open");
+  
+  // Save බටන් එකට අදාළ ID එක දාන්න
+  document.getElementById("submitStartJobBtn").onclick = () => submitJobStart(id);
+}
+
+// ✅ 2. Mechanic ගේ නම දාලා Start කරන Function එක
+async function submitJobStart(id) {
+  const mechanic = document.getElementById("startJobMechanic").value.trim();
+  if (!mechanic) {
+    alert("Please enter the Mechanic's name to start the job.");
     return;
   }
 
+  const btn = document.getElementById("submitStartJobBtn");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Starting...";
+
   try {
-    const payload = { ID: id, Status: newStatus };
-    
-    if (newStatus === "In Progress") {
-      const tz = "Asia/Colombo";
-      const now = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace("T", " ").slice(0, 16); 
-      payload["Start Date"] = now;
-    }
+    const tz = "Asia/Colombo";
+    const now = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace("T", " ").slice(0, 16); 
+
+    const payload = { 
+      ID: id, 
+      Status: "In Progress",
+      "Assigned To": mechanic,
+      "Start Date": now
+    };
 
     await Api.update("JobCards", payload, currentUser.username);
-    loadJobCardsView(); 
+    
+    document.getElementById("startJobModal").classList.remove("open");
+    updateJobCardIncremental_(payload); // Kanban Board එකේ Card එක Move කරන්න
+    
+    btn.disabled = false;
+    btn.textContent = originalText;
+  } catch (err) {
+    alert("Failed to start job: " + err.message);
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ✅ Job Card එකක් විතරක් update කරන්න (Kanban move සහිතව)
+function updateJobCardIncremental_(jobUpdate) {
+  // 1. Cache එකට merge කරන්න
+  const idx = cache.JobCards.findIndex(j => String(j.ID) === String(jobUpdate.ID));
+  if (idx !== -1) {
+    cache.JobCards[idx] = { ...cache.JobCards[idx], ...jobUpdate };
+  } else {
+    cache.JobCards.push(jobUpdate);
+  }
+  const merged = idx !== -1 ? cache.JobCards[idx] : jobUpdate;
+
+  // 2. දැනට පේන card එක හොයන්න
+  const existingCard = document.querySelector(`.job-card[data-job-id="${merged.ID}"]`);
+  if (!existingCard) {
+    // නොපෙනෙනවා නම් full reload (rare)
+    loadJobCardsView();
+    return;
+  }
+
+  // 3. Current column එක සහ target column එක තීරණය කරන්න
+  const currentCol = existingCard.closest('.kanban-col');
+  const colHead = currentCol?.querySelector('.kanban-col-head');
+  const currentType = colHead?.classList.contains('progress') ? 'progress'
+                   : colHead?.classList.contains('completed') ? 'completed'
+                   : 'pending';
+
+  const targetType = (merged.Status === "Completed") ? "completed"
+                   : (merged.Status === "In Progress") ? "progress"
+                   : "pending";
+
+  const newHtml = buildJobCardHtml_(merged, targetType);
+
+  if (currentType === targetType) {
+    // 4a. Column එකේ වෙනසක් නෑ → card එකේ HTML විතරක් replace
+    existingCard.outerHTML = newHtml;
+  } else {
+    // 4b. Column වෙනස් → card එක move කරන්න
+    existingCard.remove();
+
+    const targetColHead = document.querySelector(`.kanban-col-head.${targetType}`);
+    const targetCol = targetColHead?.closest('.kanban-col');
+    if (targetCol) {
+      const wrap = targetCol.querySelector('.kanban-cards-wrap');
+      const hint = wrap.querySelector('.hint');
+      if (hint) hint.remove();
+      wrap.insertAdjacentHTML("afterbegin", newHtml);
+    }
+
+    // 5. Column counts update කරන්න
+    refreshKanbanCounts_();
+  }
+}
+
+// ✅ Column badges update + empty state
+function refreshKanbanCounts_() {
+  document.querySelectorAll('.kanban-col').forEach(col => {
+    const count = col.querySelectorAll('.job-card').length;
+    const badge = col.querySelector('.kanban-col-head .badge');
+    if (badge) badge.textContent = count;
+
+    const wrap = col.querySelector('.kanban-cards-wrap');
+    if (count === 0 && !wrap.querySelector('.hint')) {
+      wrap.insertAdjacentHTML("beforeend", `<div class="hint" style="text-align:center; margin-top:20px;">No jobs here.</div>`);
+    }
+  });
+}
+
+// ✅ 1. Notification Modal එක ඕපන් කරන එක
+function openJobNotifModal() {
+  renderJobNotifTable();
+  document.getElementById("jobNotifModal").classList.add("open");
+}
+
+// ✅ 2. Requested Jobs ටේබල් එකේ පෙන්නන එක
+function renderJobNotifTable() {
+  const body = document.getElementById("jobNotifBody");
+  const requested = (cache.JobCards || []).filter(j => j.Status === "Requested");
+
+  if (!requested.length) {
+    body.innerHTML = `<div class="hint" style="padding:20px; text-align:center;">No new job requests from Transport.</div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Vehicle</th><th>Req By</th><th>Description</th><th>Date</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${requested.map(j => `
+            <tr>
+              <td><b>${j["Vehicle No"]}</b></td>
+              <td>${j["Requested By"]}</td>
+              <td>${j["Description"]}</td>
+              <td>${j["Date"]}</td>
+              <td>
+                <button class="btn btn-primary" style="padding:4px 10px; font-size:12px;" onclick="openAcceptJobModal('${j.ID}')">Accept</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ✅ 3. Accept බටන් එක ඔබද්දී කුඩා Form එක ඕපන් කරන එක
+function openAcceptJobModal(id) {
+  const job = cache.JobCards.find(j => String(j.ID) === String(id));
+  if (!job) return;
+
+  document.getElementById("acceptJobNo").textContent = job.ID.startsWith("AMJ-") ? job.ID : `AMJ-${String(job.ID).padStart(6, '0')}`;
+  document.getElementById("acceptJobPriority").value = "Medium";
+  document.getElementById("acceptJobOther").value = "";
+  
+  document.getElementById("acceptJobModal").classList.add("open");
+  document.getElementById("submitAcceptJobBtn").onclick = () => submitAcceptJob(id);
+}
+
+// ✅ 4. Save කරාම Pending එකට යවන එක
+async function submitAcceptJob(id) {
+  const btn = document.getElementById("submitAcceptJobBtn");
+  btn.disabled = true;
+  btn.textContent = "Accepting...";
+
+  const priority = document.getElementById("acceptJobPriority").value;
+  const otherDetails = document.getElementById("acceptJobOther").value;
+
+  try {
+    const payload = { 
+      ID: id, 
+      Status: "Pending", 
+      Priority: priority,
+      "Other Details": otherDetails,
+      "Accepted By": currentUser.username
+    };
+
+    await Api.update("JobCards", payload, currentUser.username);
+    
+    // Cache එක Update කරන්න
+    const idx = cache.JobCards.findIndex(j => String(j.ID) === String(id));
+    if (idx !== -1) {
+      cache.JobCards[idx] = { ...cache.JobCards[idx], ...payload };
+    }
+
+    document.getElementById("acceptJobModal").classList.remove("open");
+    renderJobNotifTable(); // Table එකෙන් අයින් කරන්න
+    loadJobCardsView();    // Kanban එකට එකතු කරන්න
+    updateJobNotifBadge(); // Badge එක අඩු කරන්න
+
+    btn.disabled = false;
+    btn.textContent = "Accept & Send to Pending";
+  } catch (err) {
+    alert("Failed to accept job: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "Accept & Send to Pending";
+  }
+}
+
+// ✅ 5. Notification Badge (රතු පාට අංකය) Update කරන එක
+function updateJobNotifBadge() {
+  const badge = document.getElementById("jobNotifBadge");
+  if (!badge) return;
+  
+  const requestedCount = (cache.JobCards || []).filter(j => j.Status === "Requested").length;
+  if (requestedCount > 0) {
+    badge.textContent = requestedCount;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// ✅ 3. moveJobStatus එක Update කිරීම (Start සහ Complete සඳහා)
+async function moveJobStatus(id, newStatus) {
+  if (newStatus === "In Progress") {
+    openStartJobModal(id); // Start ඔබද්දී Form එක ඕපන් වෙන්න
+    return;
+  }
+  
+  if (newStatus === "Completed") {
+    openCompleteJobModal(id); // Complete ඔබද්දී Form එක ඕපන් වෙන්න
+    return;
+  }
+
+  // අනිත් ඒවාට (ඕන නම්) සාමාන්‍ය විදියට වැඩ කරන්න
+  try {
+    const payload = { ID: id, Status: newStatus };
+    await Api.update("JobCards", payload, currentUser.username);
+    updateJobCardIncremental_(payload);
   } catch (err) {
     alert("Failed to update status: " + err.message);
   }
@@ -3971,6 +5277,30 @@ async function loadAttendanceView() {
     renderAttendanceGrid();
   });
 
+  // ✅ Left Arrow (Previous Day)
+  document.getElementById("prevDateBtn")?.addEventListener("click", () => {
+    const d = new Date(attendanceDate_);
+    d.setDate(d.getDate() - 1); // දවසක් අඩු කරන්න
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    attendanceDate_ = `${y}-${m}-${day}`;
+    datePicker.value = attendanceDate_;
+    renderAttendanceGrid();
+  });
+
+  // ✅ Right Arrow (Next Day)
+  document.getElementById("nextDateBtn")?.addEventListener("click", () => {
+    const d = new Date(attendanceDate_);
+    d.setDate(d.getDate() + 1); // දවසක් වැඩි කරන්න
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    attendanceDate_ = `${y}-${m}-${day}`;
+    datePicker.value = attendanceDate_;
+    renderAttendanceGrid();
+  });
+
   // Sub-tab logic
   const tabBtns = document.querySelectorAll("#attendanceDeptTabs .dash-tab-btn");
   tabBtns.forEach(btn => {
@@ -4010,39 +5340,76 @@ async function loadAttendanceView() {
 
 function renderAttendanceGrid() {
   const grid = document.getElementById("attendanceGrid");
+  const bulkSaveBtn = document.getElementById("bulkSaveBtn");
   if (!grid) return;
+
+  // ✅ දවස් 2කට වඩා පරණද කියලා බලන්න (String Comparison එකෙන් - Timezone ප්‍රශ්න එන්නේ නෑ)
+  const today = new Date();
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
+  const limitDateStr = twoDaysAgo.toLocaleDateString('en-CA'); // මේකෙන් YYYY-MM-DD එනවා
+  
+  // තෝරාගත් දිනය අර සීමාවට වඩා පරණ නම් විතරක් Lock වෙනවා
+  const isLocked = attendanceDate_ < limitDateStr;
 
   // Filter Employees by Department and Active Status
   let employees = (cache.Drivers || []).filter(d => {
     const dept = String(d.Department || "").trim();
-    const status = String(d.Status || "Active").trim(); // Status එකක් නැත්නම් Active කියලා හිතන්න
+    const status = String(d.Status || "Active").trim();
     return dept === attendanceDept_ && status === "Active"; 
   });
 
-  // Filter attendance for the selected date
   const todaysAtt = (cache.Attendance || []).filter(a => 
     String(a.Date) === attendanceDate_ && a.Department === attendanceDept_
   );
 
   if (!employees.length) {
-    grid.innerHTML = `<div class="hint" style="text-align:center; margin-top:20px;">No employees found in ${attendanceDept_} Department.<br><small>Please add employees in Driver Master with Department set to "${attendanceDept_}"</small></div>`;
+    grid.innerHTML = `<div class="hint" style="text-align:center; margin-top:20px;">No active employees found in ${attendanceDept_} Department.</div>`;
+    if (bulkSaveBtn) bulkSaveBtn.style.display = "none";
     return;
   }
 
-  grid.innerHTML = employees.map(emp => {
+  // ✅ බටන් එක පෙන්නන්න / හංගන්න
+  if (bulkSaveBtn) {
+    // Lock වෙලා නැත්නම් විතරක් බටන් එක පෙන්නන්න
+    bulkSaveBtn.style.display = isLocked ? "none" : "block"; 
+  }
+
+  let lockBanner = "";
+  if (isLocked) {
+    lockBanner = `
+      <div style="grid-column: 1 / -1; background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-bottom: 10px; border: 1px solid #fca5a5; text-align: center;">
+        🔒 Editing is locked. You can only edit attendance for today and yesterday.
+      </div>
+    `;
+  }
+
+  grid.innerHTML = lockBanner + employees.map(emp => {
     const empName = emp.Name;
-    // Check if attendance exists
     const record = todaysAtt.find(a => String(a["Employee Name"]) === String(empName));
     
-    const status = record ? record.Status : "";
-    const inTime = record ? (record["In Time"] || "") : "";
-    const outTime = record ? (record["Out Time"] || "") : "";
+    // ✅ Default අගයන් දෙන්න (Record එකක් නැත්නම් Present, 08:00, 17:00)
+    const status = record ? record.Status : "Present";
+    
+    // පොඩි Helper Function එකක් දාලා 1899 වගේ ඒවා හරි ගස්සමු
+    const cleanTime = (timeStr, defaultVal) => {
+      if (!timeStr) return defaultVal;
+      let t = String(timeStr);
+      if (t.includes("1899")) return defaultVal; // 1899 ආවොත් Default එක දෙන්න
+      if (t.includes(":") && t.length > 5) return t.substring(0, 5); // තත්පර තියෙනවා නම් අයින් කරන්න (HH:mm)
+      return t;
+    };
+
+    const inTime = record ? cleanTime(record["In Time"], "08:00") : "08:00";
+    const outTime = record ? cleanTime(record["Out Time"], "17:00") : "17:00";
     const recId = record ? record.ID : "";
 
     const statuses = ["Present", "Absent", "Half Day", "Leave"];
+    const disabledAttr = isLocked ? "disabled" : "";
+    const disabledStyle = isLocked ? "opacity: 0.6; cursor: not-allowed;" : "";
 
     return `
-      <div class="att-card" data-name="${empName}" data-id="${recId}">
+      <div class="att-card" data-name="${empName}" data-id="${recId}" style="${disabledStyle}">
         <div class="att-header">
           <span class="att-emp-name">👤 ${empName}</span>
           <span class="att-emp-dept">${emp.Department || "N/A"}</span>
@@ -4052,6 +5419,7 @@ function renderAttendanceGrid() {
           ${statuses.map(s => `
             <button class="att-btn ${status === s ? 'active' : ''}" 
                     data-status="${s}" 
+                    ${disabledAttr}
                     onclick="markAttendance(this, '${empName}', '${s}')">
               ${s}
             </button>
@@ -4060,10 +5428,10 @@ function renderAttendanceGrid() {
 
         <div class="att-times">
           <label>In Time
-            <input type="time" value="${inTime}" onchange="updateAttTime(this, '${empName}', 'In Time', this.value)">
+            <input type="time" value="${inTime}" ${disabledAttr} onchange="updateAttTime(this, '${empName}', 'In Time', this.value)">
           </label>
           <label>Out Time
-            <input type="time" value="${outTime}" onchange="updateAttTime(this, '${empName}', 'Out Time', this.value)">
+            <input type="time" value="${outTime}" ${disabledAttr} onchange="updateAttTime(this, '${empName}', 'Out Time', this.value)">
           </label>
         </div>
       </div>
@@ -4071,9 +5439,74 @@ function renderAttendanceGrid() {
   }).join("");
 }
 
+// ✅ ඔක්කොම Present ලෙස Save කරන්න
+async function saveAllDefaults_() {
+  const btn = document.getElementById("bulkSaveBtn");
+  if (!btn) return;
+  
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Saving all...";
+  btn.style.opacity = "0.7";
+
+  let savedCount = 0;
+  const cards = document.querySelectorAll(".att-card");
+
+  for (let card of cards) {
+    const recId = card.dataset.id;
+    const empName = card.dataset.name;
+
+    // Record එකක් නැත්නම් විතරක් අලුතෙන් දාන්න
+    if (!recId) {
+      try {
+        const payload = {
+          Date: attendanceDate_,
+          Department: attendanceDept_,
+          "Employee Name": empName,
+          Status: "Present",
+          "In Time": "08:00",
+          "Out Time": "17:00"
+        };
+        const res = await Api.add("Attendance", payload, currentUser.username);
+        
+        payload.ID = res.id;
+        if (!cache.Attendance) cache.Attendance = [];
+        cache.Attendance.push(payload);
+        
+        card.dataset.id = res.id;
+        savedCount++;
+      } catch (err) {
+        console.error("Failed to save default for " + empName, err);
+      }
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = originalText;
+  btn.style.opacity = "1";
+  
+  if (savedCount > 0) {
+    // Toast එකක් වගේ පෙන්නන්න
+    alert(`✅ Saved ${savedCount} default attendance records!`);
+  } else {
+    alert("All employees already have records for this date.");
+  }
+}
+
 async function markAttendance(btn, empName, newStatus) {
   const card = btn.closest(".att-card");
   const recId = card.dataset.id;
+
+  // ✅ Lock වෙලා තියෙනවද බලන්න (String Comparison)
+  const today = new Date();
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
+  const limitDateStr = twoDaysAgo.toLocaleDateString('en-CA');
+  
+  if (attendanceDate_ < limitDateStr) {
+    alert("🔒 This date is locked. You cannot edit attendance older than 2 days.");
+    return;
+  }
   
   // UI Update instantly (Optimistic UI)
   card.querySelectorAll(".att-btn").forEach(b => b.classList.remove("active"));
@@ -4120,6 +5553,17 @@ async function markAttendance(btn, empName, newStatus) {
 async function updateAttTime(input, empName, field, value) {
   const card = input.closest(".att-card");
   const recId = card.dataset.id;
+
+    // ✅ Lock වෙලා තියෙනවද බලන්න (String Comparison)
+  const today = new Date();
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
+  const limitDateStr = twoDaysAgo.toLocaleDateString('en-CA');
+  
+  if (attendanceDate_ < limitDateStr) {
+    alert("🔒 This date is locked. You cannot edit attendance older than 2 days.");
+    return;
+  }
   
   if (!recId) {
     alert("Please mark attendance status first before adding time.");
@@ -4184,7 +5628,7 @@ function renderEmployeesGroup() {
 function printAttendanceReport() {
   const fromDate = document.getElementById("attReportFrom").value;
   const toDate = document.getElementById("attReportTo").value;
-  const dept = attendanceDept_; // දැනට active තියෙන ඩිපාර්ට්මන්ට් එක
+  const dept = attendanceDept_; 
 
   if (!fromDate || !toDate) {
     alert("Please select both From and To dates.");
@@ -4202,13 +5646,47 @@ function printAttendanceReport() {
     return;
   }
 
-  // දිනය අනුව පිළිවෙලට හදන්න
   records.sort((a, b) => {
     if (a.Date !== b.Date) return String(a.Date).localeCompare(String(b.Date));
     return String(a["Employee Name"]).localeCompare(String(b["Employee Name"]));
   });
 
-  // 2. Table Rows හදන්න
+  // ✅ වෙලාව ලස්සනට හරවන්න Helper Function එකක්
+  const formatTime_ = (timeStr) => {
+    if (!timeStr || timeStr === "-" || String(timeStr).includes("1899")) return "-";
+    const parts = String(timeStr).split(":");
+    if (parts.length < 2) return timeStr;
+    let h = parseInt(parts[0], 10);
+    let m = parts[1];
+    let ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  };
+
+  // ✅ වෙලාව මිනිත්තු වලට හරවන්න Helper Function එකක්
+  const timeToMins_ = (timeStr) => {
+    if (!timeStr || timeStr === "-" || String(timeStr).includes("1899")) return 0;
+    const parts = String(timeStr).split(":");
+    if (parts.length < 2) return 0;
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  };
+
+  // ✅ මිනිත්තු ආයේ "Xh Ym" වලට හරවන්න Helper Function එකක්
+  const formatDuration_ = (totalMins) => {
+    if (totalMins <= 0) return "-";
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    let str = "";
+    if (h > 0) str += `${h}h `;
+    if (m > 0 || h === 0) str += `${m}m`;
+    return str.trim();
+  };
+
+  // 2. Table Rows සහ Summary හදන්න
+  const summary = {};
+  let totalWorkMinsAll = 0;
+  let totalOvertimeMinsAll = 0;
+
   const tableRows = records.map(r => {
     let statusColor = "";
     if (r.Status === "Present") statusColor = "color: #15803d; font-weight:bold;";
@@ -4216,27 +5694,47 @@ function printAttendanceReport() {
     else if (r.Status === "Half Day") statusColor = "color: #b45309; font-weight:bold;";
     else if (r.Status === "Leave") statusColor = "color: #1d4ed8; font-weight:bold;";
 
+    // Working Hours & Overtime ගණනය කිරීම
+    const inMins = timeToMins_(r["In Time"]);
+    const outMins = timeToMins_(r["Out Time"]);
+    let workMins = 0;
+    
+    if (inMins > 0 && outMins > 0) {
+      workMins = outMins - inMins;
+      if (workMins < 0) workMins += 24 * 60; // රැය පහන් වෙනකම් වැඩ කරනවා නම් (Night Shift)
+    }
+
+    const workHoursStr = formatDuration_(workMins);
+    
+    // Overtime ගණනය කිරීම (9 පැය = 540 මිනිත්තු)
+    const standardMins = 9 * 60;
+    const overtimeMins = workMins > standardMins ? workMins - standardMins : 0;
+    const overtimeStr = formatDuration_(overtimeMins);
+
+    // Summary සඳහා දත්ත එකතු කිරීම
+    if (!summary[r["Employee Name"]]) {
+      summary[r["Employee Name"]] = { Present: 0, Absent: 0, "Half Day": 0, Leave: 0, work: 0, ot: 0 };
+    }
+    if (summary[r["Employee Name"]][r.Status] !== undefined) {
+       summary[r["Employee Name"]][r.Status]++;
+    }
+    summary[r["Employee Name"]].work += workMins;
+    summary[r["Employee Name"]].ot += overtimeMins;
+    totalWorkMinsAll += workMins;
+    totalOvertimeMinsAll += overtimeMins;
+
     return `
       <tr>
         <td>${r.Date}</td>
         <td>${r["Employee Name"]}</td>
         <td style="${statusColor}">${r.Status || "-"}</td>
-        <td>${r["In Time"] || "-"}</td>
-        <td>${r["Out Time"] || "-"}</td>
+        <td>${formatTime_(r["In Time"])}</td>
+        <td>${formatTime_(r["Out Time"])}</td>
+        <td style="font-weight:bold;">${workHoursStr}</td>
+        <td style="color:#d97706; font-weight:bold;">${overtimeStr}</td>
       </tr>
     `;
   }).join("");
-
-  // 3. සාරාංශය (Summary) හදන්න (කවුද කීයක් ආවේද)
-  const summary = {};
-  records.forEach(r => {
-    if (!summary[r["Employee Name"]]) {
-      summary[r["Employee Name"]] = { Present: 0, Absent: 0, "Half Day": 0, Leave: 0 };
-    }
-    if (summary[r["Employee Name"]][r.Status] !== undefined) {
-       summary[r["Employee Name"]][r.Status]++;
-    }
-  });
 
   const summaryRows = Object.keys(summary).map(name => {
      const s = summary[name];
@@ -4247,11 +5745,13 @@ function printAttendanceReport() {
          <td style="color:#b91c1c; font-weight:bold;">${s.Absent}</td>
          <td style="color:#b45309; font-weight:bold;">${s["Half Day"]}</td>
          <td style="color:#1d4ed8; font-weight:bold;">${s.Leave}</td>
+         <td style="font-weight:bold;">${formatDuration_(s.work)}</td>
+         <td style="color:#d97706; font-weight:bold;">${formatDuration_(s.ot)}</td>
        </tr>
      `;
   }).join("");
 
-  // 4. Print Window Content එක හදන්න
+  // 3. Print Window Content
   const printContent = `
     <html>
     <head>
@@ -4288,9 +5788,18 @@ function printAttendanceReport() {
             <th>Status</th>
             <th>In Time</th>
             <th>Out Time</th>
+            <th>Working Hours</th>
+            <th>Overtime (>9h)</th>
           </tr>
         </thead>
-        <tbody>${tableRows}</tbody>
+        <tbody>
+          ${tableRows}
+          <tr style="background-color: #fffbeb; font-weight:bold;">
+            <td colspan="5" style="text-align:right;">Total (All Employees):</td>
+            <td>${formatDuration_(totalWorkMinsAll)}</td>
+            <td style="color:#d97706;">${formatDuration_(totalOvertimeMinsAll)}</td>
+          </tr>
+        </tbody>
       </table>
 
       <div class="page-break"></div>
@@ -4304,6 +5813,8 @@ function printAttendanceReport() {
             <th style="background:#dc2626; color:white;">Absent</th>
             <th style="background:#d97706; color:white;">Half Day</th>
             <th style="background:#2563eb; color:white;">Leave</th>
+            <th style="background:#00245E; color:white;">Total Work Hrs</th>
+            <th style="background:#b45309; color:white;">Total Overtime</th>
           </tr>
         </thead>
         <tbody>${summaryRows}</tbody>
@@ -4316,7 +5827,6 @@ function printAttendanceReport() {
     </html>
   `;
 
-  // 5. Print කරන්න
   const printWindow = window.open('', '_blank');
   printWindow.document.write(printContent);
   printWindow.document.close();
@@ -4377,3 +5887,207 @@ function calculateJobDuration_(startStr, endStr) {
 
   return result.length > 0 ? result.join(" ") : "0 mins";
 }
+
+function openColumnFilter(event, tableKey, colKey, type) {
+  event.stopPropagation(); // Table Row එකේ click එක නවත්තන්න
+  currentFilterCol_ = { tableKey, colKey, type };
+
+  const popup = document.getElementById("filterPopup");
+  const content = document.getElementById("filterPopupContent");
+  const rect = event.target.getBoundingClientRect();
+
+  // 1. ඒ Column එකේ තියෙන සියලුම අලුත් (Unique) දත්ත හොයාගන්න
+  const allRows = cache[MODULES[tableKey].sheet] || [];
+  const uniqueValues = [...new Set(
+    allRows.map(r => String(r[colKey] || "").trim())
+           .filter(v => v !== "") // හිස් ඒවා අයින් කරන්න
+  )];
+
+  // ✅ දත්ත වර්ගය (Type) අනුව නිවැරදිව Sort කිරීම
+  uniqueValues.sort((a, b) => {
+    // 1. අංක (Numbers) නම් - කුඩාම එකේ සිට ලොකුම එකට
+    const isNumA = !isNaN(Number(a)) && String(a).trim() !== "";
+    const isNumB = !isNaN(Number(b)) && String(b).trim() !== "";
+    if (type === 'number' || (isNumA && isNumB)) {
+      return Number(a) - Number(b);
+    }
+    
+    // 2. දින (Dates) නම් - පරණ එකේ සිට අලුත් එකට (YYYY-MM-DD)
+    if (type === 'date') {
+      return String(a).localeCompare(String(b));
+    }
+    
+    // 3. අකුරු (Text) නම් - A සිට Z දක්වා (Case-insensitive)
+    return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
+  });
+
+  const filterKey = `${tableKey}_${colKey}`;
+  let currentSelections = activeColumnFilters_[filterKey] || [];
+  
+  // කලින් දාපු එක string එකක් නම් array එකක් කරගන්න
+  if (!Array.isArray(currentSelections)) currentSelections = [currentSelections];
+
+  // 2. Checkbox ලැයිස්තුව හදන්න
+  let checkboxesHtml = "";
+  if (uniqueValues.length > 0) {
+    checkboxesHtml = uniqueValues.map(val => `
+      <label class="filter-checkbox-item">
+        <input type="checkbox" value="${val}" ${currentSelections.includes(val) ? "checked" : ""}>
+        <span>${val}</span>
+      </label>
+    `).join("");
+  } else {
+    checkboxesHtml = `<p class="hint" style="text-align:center;">No data available</p>`;
+  }
+
+  // 3. Popup එකේ HTML එක සකස් කරන්න
+  content.innerHTML = `
+    <label style="font-size:12px; font-weight:bold; margin-bottom:8px; display:block; color:var(--navy);">
+      Filter ${MODULES[tableKey].fields.find(f=>f.key===colKey)?.label || colKey}
+    </label>
+    
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+       <button type="button" class="btn" style="padding:2px 8px; font-size:10px; background:#eef1f7; color:#333;" onclick="toggleAllCheckboxes(true)">Select All</button>
+       <button type="button" class="btn" style="padding:2px 8px; font-size:10px; background:#eef1f7; color:#333;" onclick="toggleAllCheckboxes(false)">Clear All</button>
+    </div>
+
+    <!-- ✅ අලුතෙන් එකතු කළ Search Box එක -->
+    <input type="text" id="filterSearchInput" class="filter-search-input" placeholder="Search list..." oninput="filterCheckboxList_(this.value)">
+    
+    <div class="filter-checkbox-list">
+      ${checkboxesHtml}
+    </div>
+  `;
+
+  popup.style.display = "block";
+  popup.style.left = rect.left + "px";
+  popup.style.top = (rect.bottom + window.scrollY + 5) + "px";
+}
+
+// ✅ Checkbox ඔක්කොම එකපාර තෝරන්න / අයින් කරන්න
+function toggleAllCheckboxes(checked) {
+  document.querySelectorAll(".filter-checkbox-list input[type='checkbox']").forEach(cb => {
+    cb.checked = checked;
+  });
+}
+
+// ✅ Search Box එකට Type කරද්දී ලැයිස්තුව Filter කරන්න
+function filterCheckboxList_(searchTerm) {
+  const term = searchTerm.toLowerCase().trim();
+  const items = document.querySelectorAll(".filter-checkbox-item");
+
+  items.forEach(item => {
+    const text = item.querySelector("span").textContent.toLowerCase();
+    if (text.includes(term)) {
+      item.style.display = "flex"; // ගැලපෙනවා නම් පෙන්නන්න
+    } else {
+      item.style.display = "none"; // නොගැලපෙනවා නම් හංගන්න
+    }
+  });
+}
+
+// එලියට click කළාම Popup එක වහන්න
+document.addEventListener("click", (e) => {
+  const popup = document.getElementById("filterPopup");
+  if (popup && !popup.contains(e.target)) {
+    popup.style.display = "none";
+  }
+});
+
+function applyColumnFilter() {
+  if (!currentFilterCol_) return;
+
+  // ✅ තෝරාගෙන තියෙන හැම Checkbox එකකම අගය ගන්න
+  const checkboxes = document.querySelectorAll(".filter-checkbox-list input[type='checkbox']");
+  const selectedVals = Array.from(checkboxes)
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+  
+  const filterKey = `${currentFilterCol_.tableKey}_${currentFilterCol_.colKey}`;
+  
+  // එකක් හරි තෝරලා තියෙනවා නම් Array එක save කරන්න
+  if (selectedVals.length > 0) {
+    activeColumnFilters_[filterKey] = selectedVals;
+  } else {
+    delete activeColumnFilters_[filterKey]; // මුකුත් තෝරලා නැත්නම් හෝ ඔක්කොම clear කරලා නම් Filter එක අයින් කරන්න
+  }
+
+  document.getElementById("filterPopup").style.display = "none";
+  
+  // Table එක අලුත් කරන්න
+  const searchInput = document.getElementById(`search-${currentFilterCol_.tableKey}`);
+  paintRows(currentFilterCol_.tableKey, searchInput ? searchInput.value : "");
+}
+
+function clearColumnFilter() {
+  toggleAllCheckboxes(false);
+  applyColumnFilter();
+}
+
+// ===================================================================
+// SIDEBAR HOVER TOOLTIP
+// ===================================================================
+document.addEventListener("DOMContentLoaded", () => {
+  const tooltip = document.getElementById("sidebar-tooltip");
+  if (!tooltip) return;
+
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("mouseenter", (e) => {
+      // Sidebar එක collapse වෙලා තියෙනවද බලන්න
+      const isCollapsed = document.getElementById("sidebar").classList.contains("collapsed");
+      if (!isCollapsed) return;
+
+      const tooltipText = item.getAttribute("data-tooltip");
+      if (!tooltipText) return;
+
+      tooltip.textContent = tooltipText;
+      
+      // අයිකන් එකේ පිහිටීම ගන්න
+      const rect = item.getBoundingClientRect();
+      
+      // Tooltip එක අයිකන් එකට දකුණු පැත්තෙන් ලස්සනට තියන්න
+      tooltip.style.left = (rect.right + 15) + "px";
+      tooltip.style.top = (rect.top + rect.height / 2) + "px";
+      tooltip.style.opacity = "1";
+    });
+
+    item.addEventListener("mouseleave", () => {
+      tooltip.style.opacity = "0";
+    });
+  });
+});
+
+// ============================================
+// ✅ DARK MODE / LIGHT MODE LOGIC
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  const themeToggleBtn = document.getElementById("themeToggleBtn");
+  if (!themeToggleBtn) return;
+
+  // 1. කලින් Save කරලා තියෙන Theme එක ලෝඩ් කරගන්න
+  const savedTheme = localStorage.getItem("vms_theme");
+  if (savedTheme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+    themeToggleBtn.textContent = "☀️";
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+    themeToggleBtn.textContent = "🌙";
+  }
+
+  // 2. බටන් එක ඔබද්දී Theme එක මාරු කරන්න
+  themeToggleBtn.addEventListener("click", () => {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    
+    if (isDark) {
+      // Light Mode එකට මාරු වෙනවා
+      document.documentElement.removeAttribute("data-theme");
+      localStorage.setItem("vms_theme", "light");
+      themeToggleBtn.textContent = "🌙";
+    } else {
+      // Dark Mode එකට මාරු වෙනවා
+      document.documentElement.setAttribute("data-theme", "dark");
+      localStorage.setItem("vms_theme", "dark");
+      themeToggleBtn.textContent = "☀️";
+    }
+  });
+});
